@@ -14,6 +14,18 @@ param(
 
 Write-Host "🚀 Starting Lab 1 Infrastructure Deployment..." -ForegroundColor Cyan
 
+# Check required modules
+Write-Host "`n🔍 Checking Azure PowerShell modules..." -ForegroundColor Yellow
+$requiredModules = @('Az.Network', 'Az.Compute', 'Az.Resources')
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module)) {
+        Write-Host "⚠️  Module $module not found. Installing..." -ForegroundColor Yellow
+        Install-Module -Name $module -Repository PSGallery -Force -AllowClobber -Scope CurrentUser
+    }
+    Import-Module -Name $module -ErrorAction Stop
+}
+Write-Host "✅ All required modules loaded" -ForegroundColor Green
+
 # 1. Create Resource Group
 Write-Host "`n📦 Creating Resource Group: $ResourceGroupName" -ForegroundColor Yellow
 $rg = New-AzResourceGroup -Name $ResourceGroupName -Location $Location -Force
@@ -74,11 +86,15 @@ $firewall = New-AzFirewall `
     -VirtualNetwork $vnet `
     -PublicIpAddress $firewallPip `
     -FirewallPolicyId $firewallPolicy.Id `
-    -Sku AZFW_VNet `
-    -Tier Standard
+    -SkuName AZFW_VNet `
+    -SkuTier Standard
 
 Write-Host "✅ Azure Firewall deployed" -ForegroundColor Green
-Write-Host "   Private IP: $($firewall.IpConfigurations[0].PrivateIPAddress)" -ForegroundColor Cyan
+if ($firewall.IpConfigurations -and $firewall.IpConfigurations.Count -gt 0) {
+    Write-Host "   Private IP: $($firewall.IpConfigurations[0].PrivateIPAddress)" -ForegroundColor Cyan
+} else {
+    Write-Host "   ⚠️  Firewall deployed but IP configuration not available yet" -ForegroundColor Yellow
+}
 
 # 6. Create NSG for Client Subnet
 Write-Host "`n🔒 Creating Network Security Group..." -ForegroundColor Yellow
@@ -143,6 +159,15 @@ $vm = New-AzVM `
 
 Write-Host "✅ Client VM deployed" -ForegroundColor Green
 
+# Get firewall details after deployment
+Write-Host "`n🔍 Retrieving firewall configuration..." -ForegroundColor Yellow
+$firewall = Get-AzFirewall -Name "afw-lab1" -ResourceGroupName $ResourceGroupName
+$firewallPrivateIP = if ($firewall.IpConfigurations -and $firewall.IpConfigurations.Count -gt 0) {
+    $firewall.IpConfigurations[0].PrivateIPAddress
+} else {
+    "Not available"
+}
+
 # Summary
 Write-Host "`n" + ("="*80) -ForegroundColor Cyan
 Write-Host "🎉 Lab 1 Infrastructure Deployment Complete!" -ForegroundColor Green
@@ -151,7 +176,7 @@ Write-Host "`nDeployment Summary:" -ForegroundColor Yellow
 Write-Host "  Resource Group: $ResourceGroupName"
 Write-Host "  Location: $Location"
 Write-Host "  Firewall Name: afw-lab1"
-Write-Host "  Firewall Private IP: $($firewall.IpConfigurations[0].PrivateIPAddress)"
+Write-Host "  Firewall Private IP: $firewallPrivateIP"
 Write-Host "  Firewall Public IP: $($firewallPip.IpAddress)"
 Write-Host "  Client VM Name: vm-client-lab1"
 Write-Host "  Client VM Public IP: $($clientPip.IpAddress)"
@@ -168,7 +193,7 @@ Write-Host ("="*80) -ForegroundColor Cyan
 $deploymentInfo = @{
     ResourceGroup = $ResourceGroupName
     Location = $Location
-    FirewallPrivateIP = $firewall.IpConfigurations[0].PrivateIPAddress
+    FirewallPrivateIP = $firewallPrivateIP
     FirewallPublicIP = $firewallPip.IpAddress
     ClientVMPublicIP = $clientPip.IpAddress
     FirewallPolicyId = $firewallPolicy.Id

@@ -15,6 +15,18 @@ param(
 Write-Host "🚀 Starting Lab 3 Hub-Spoke Infrastructure Deployment..." -ForegroundColor Cyan
 Write-Host "⏱️  This will take approximately 15-20 minutes..." -ForegroundColor Yellow
 
+# Check required modules
+Write-Host "`n🔍 Checking Azure PowerShell modules..." -ForegroundColor Yellow
+$requiredModules = @('Az.Network', 'Az.Compute', 'Az.Resources')
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module)) {
+        Write-Host "⚠️  Module $module not found. Installing..." -ForegroundColor Yellow
+        Install-Module -Name $module -Repository PSGallery -Force -AllowClobber -Scope CurrentUser
+    }
+    Import-Module -Name $module -ErrorAction Stop
+}
+Write-Host "✅ All required modules loaded" -ForegroundColor Green
+
 # 1. Create Resource Group
 Write-Host "`n📦 Creating Resource Group: $ResourceGroupName" -ForegroundColor Yellow
 $rg = New-AzResourceGroup -Name $ResourceGroupName -Location $Location -Force
@@ -138,11 +150,19 @@ $firewall = New-AzFirewall `
     -VirtualNetwork $hubVnet `
     -PublicIpAddress $firewallPip `
     -FirewallPolicyId $firewallPolicy.Id `
-    -Sku AZFW_VNet `
-    -Tier Premium
+    -SkuName AZFW_VNet `
+    -SkuTier Premium
 
 Write-Host "✅ Azure Firewall deployed in Hub" -ForegroundColor Green
-$firewallPrivateIP = $firewall.IpConfigurations[0].PrivateIPAddress
+
+# Retrieve the firewall configuration to get the private IP
+$firewall = Get-AzFirewall -Name "afw-hub" -ResourceGroupName $ResourceGroupName
+if ($firewall.IpConfigurations -and $firewall.IpConfigurations.Count -gt 0) {
+    $firewallPrivateIP = $firewall.IpConfigurations[0].PrivateIPAddress
+} else {
+    Write-Warning "Firewall IP configuration not yet available. Using default."
+    $firewallPrivateIP = "Not available"
+}
 
 # 9. Create Route Tables
 Write-Host "`n🛣️  Creating Route Tables for Spokes..." -ForegroundColor Yellow
