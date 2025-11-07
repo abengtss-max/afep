@@ -470,7 +470,180 @@ netsh winhttp set proxy proxy-server="http=10.0.0.4:8081;https=10.0.0.4:8443" by
 Invoke-WebRequest -Uri "http://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
 
 # HTTPS test - uses port 8443 automatically
+# HTTPS test - uses port 8443 automatically
 Invoke-WebRequest -Uri "https://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
+```
+
+---
+
+## Lab 2: PAC File Issues
+
+### Issue 5: PAC File Variable Not Expanding
+
+**Symptoms:**
+- PAC file contains `return "PROXY ";` with no IP/port
+- Browser can't connect through proxy
+
+**Cause:** PowerShell here-string literal doesn't expand variables directly
+
+**Solution:**
+
+```powershell
+# FIX: Use intermediate variable before here-string
+$proxyServer = "${FirewallPrivateIP}:${ProxyHttpPort}"
+$pacContent = @"
+function FindProxyForURL(url, host) {
+    return "PROXY $proxyServer";
+}
+"@
+
+# Verify PAC file content after creation
+Get-Content "$env:TEMP\proxy.pac"
+```
+
+### Issue 6: PAC File Uses Wrong Port
+
+**Symptoms:**
+- PAC file has port 8080 but firewall uses 8081
+- ERR_PROXY_CONNECTION_FAILED in browser
+
+**Cause:** Hardcoded port doesn't match firewall configuration
+
+**Solution:**
+
+```powershell
+# Always pass correct port parameter when deploying Lab 2
+.\scripts\Deploy-Lab2-PAC-Infrastructure.ps1 `
+    -FirewallPrivateIP "10.0.0.4" `
+    -ProxyHttpPort 8081 `
+    -ProxyHttpsPort 8443
+
+# Verify PAC file content
+$sasUrl = (Get-Content ".\Lab2-PAC-Info.json" | ConvertFrom-Json).SASUrl
+[System.Text.Encoding]::ASCII.GetString((Invoke-WebRequest -Uri $sasUrl -UseBasicParsing).Content)
+```
+
+### Issue 7: PAC File Only Supports HTTP or HTTPS
+
+**Symptoms:**
+- HTTPS sites don't work with PAC file
+- ERR_TUNNEL_CONNECTION_FAILED for HTTPS URLs
+
+**Cause:** PAC file needs protocol-specific routing
+
+**Solution:**
+
+```javascript
+// Enhanced PAC file with HTTP/HTTPS detection
+function FindProxyForURL(url, host) {
+    // Internal domains go direct (bypass proxy)
+    if (dnsDomainIs(host, ".company.com") || 
+        dnsDomainIs(host, ".internal.local") ||
+        isInNet(host, "10.0.0.0", "255.0.0.0")) {
+        return "DIRECT";
+    }
+    
+    // Microsoft services go through proxy
+    if (dnsDomainIs(host, ".microsoft.com") || 
+        dnsDomainIs(host, ".bing.com")) {
+        // Use different ports for HTTP vs HTTPS
+        if (url.substring(0, 6) == "https:") {
+            return "PROXY 10.0.0.4:8443";
+        } else {
+            return "PROXY 10.0.0.4:8081";
+        }
+    }
+    
+    // All other traffic goes through proxy
+    if (url.substring(0, 6) == "https:") {
+        return "PROXY 10.0.0.4:8443";
+    } else {
+        return "PROXY 10.0.0.4:8081";
+    }
+}
+```
+
+### Issue 8: PAC File Not Active in Browser
+
+**Symptoms:**
+- `GetSystemWebProxy().GetProxy()` returns direct connection
+- PAC URL configured but not used
+
+**Cause:** Windows limitation - PAC files work in browsers but not WinHTTP/PowerShell
+
+**Solution:**
+
+```powershell
+# This is EXPECTED behavior - PAC files don't work with WinHTTP
+# Test in browser instead:
+
+# 1. Verify PAC URL is set
+Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" | 
+    Select-Object AutoConfigURL, ProxyEnable
+
+# 2. Import to WinHTTP (won't work for PAC, but try anyway)
+netsh winhttp import proxy source=ie
+
+# 3. Test in Edge browser (this WILL work)
+Stop-Process -Name msedge -Force -ErrorAction SilentlyContinue
+# Open Edge and navigate to test sites
+
+# Note: PowerShell's GetSystemWebProxy() will always show direct connection
+# This doesn't mean PAC file isn't working - browsers use PAC files correctly
+```
+
+### Issue 9: Storage Account Key Authentication Blocked
+
+**Symptoms:**
+- `KeyBasedAuthenticationNotPermitted` error
+- Blob upload fails with 403
+
+**Cause:** Azure subscription policy blocks storage account key authentication
+
+**Solution:**
+
+```powershell
+# Script already fixed to use Entra ID authentication
+# Verify storage account settings:
+$storageAccount = Get-AzStorageAccount -ResourceGroupName "RG-AFEP-Lab1" -Name "afepstorage..."
+
+# Check authentication settings
+Write-Host "AllowSharedKeyAccess: $($storageAccount.AllowSharedKeyAccess)"
+Write-Host "AllowBlobPublicAccess: $($storageAccount.AllowBlobPublicAccess)"
+
+# The deploy script uses:
+# - New-AzStorageContext with -UseConnectedAccount (Entra ID)
+# - Role assignment: Storage Blob Data Contributor
+# - SAS token generation works with Entra ID context
+```
+
+### Issue 10: Incomplete SAS URL Generation
+
+**Symptoms:**
+- SAS URL only contains query parameters
+- Missing base URL (https://storage.blob.core.windows.net/...)
+
+**Cause:** Missing `-FullUri` parameter in SAS token generation
+
+**Solution:**
+
+```powershell
+# CORRECT: Use -FullUri to get complete URL
+$sasToken = New-AzStorageBlobSASToken `
+    -Container "pacfiles" `
+    -Blob "proxy.pac" `
+    -Permission "r" `
+    -StartTime $startTime `
+    -ExpiryTime $expiryTime `
+    -Context $ctx `
+    -Protocol HttpsOnly `
+    -FullUri  # <-- This returns complete URL
+
+# $sasToken now contains: https://storage.blob.core.windows.net/container/blob?sv=...
+```
+
+---
+
 ```
 
 **Note**: When proxy is configured with protocol-specific format (`http=IP:8081;https=IP:8443`), PowerShell automatically uses the correct port based on the URL scheme (http:// vs https://). You don't need to specify `-Proxy` parameter explicitly.
