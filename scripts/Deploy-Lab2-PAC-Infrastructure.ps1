@@ -12,7 +12,10 @@ param(
     [string]$FirewallPrivateIP = "10.0.0.4",
     
     [Parameter(Mandatory=$false)]
-    [int]$ProxyHttpPort = 8443
+    [int]$ProxyHttpPort = 8081,
+    
+    [Parameter(Mandatory=$false)]
+    [int]$ProxyHttpsPort = 8443
 )
 
 Write-Host "🚀 Starting Lab 2 PAC File Infrastructure Setup..." -ForegroundColor Cyan
@@ -80,8 +83,9 @@ Write-Host "✅ Container created" -ForegroundColor Green
 # 4. Create PAC File
 Write-Host "`n📝 Creating PAC file..." -ForegroundColor Yellow
 
-# Create PAC content with variable expansion
-$proxyServer = "${FirewallPrivateIP}:${ProxyHttpPort}"
+# Create PAC content with variable expansion - supports both HTTP and HTTPS
+$httpProxy = "${FirewallPrivateIP}:${ProxyHttpPort}"
+$httpsProxy = "${FirewallPrivateIP}:${ProxyHttpsPort}"
 $pacContent = @"
 function FindProxyForURL(url, host) {
     // Internal domains go direct (bypass proxy)
@@ -94,11 +98,20 @@ function FindProxyForURL(url, host) {
     // Microsoft services go through proxy
     if (dnsDomainIs(host, ".microsoft.com") || 
         dnsDomainIs(host, ".bing.com")) {
-        return "PROXY $proxyServer";
+        // Use different ports for HTTP vs HTTPS
+        if (url.substring(0, 6) == "https:") {
+            return "PROXY $httpsProxy";
+        } else {
+            return "PROXY $httpProxy";
+        }
     }
     
     // All other traffic goes through proxy
-    return "PROXY $proxyServer";
+    if (url.substring(0, 6) == "https:") {
+        return "PROXY $httpsProxy";
+    } else {
+        return "PROXY $httpProxy";
+    }
 }
 "@
 
@@ -151,7 +164,8 @@ Write-Host "  Storage Account: $StorageAccountName"
 Write-Host "  Container: pacfiles"
 Write-Host "  Blob Name: proxy.pac"
 Write-Host "  Firewall IP in PAC: $FirewallPrivateIP"
-Write-Host "  Proxy Port in PAC: $ProxyHttpPort"
+Write-Host "  HTTP Proxy Port in PAC: $ProxyHttpPort"
+Write-Host "  HTTPS Proxy Port in PAC: $ProxyHttpsPort"
 Write-Host "`n🔗 PAC File SAS URL:" -ForegroundColor Yellow
 Write-Host "  $sasUrl" -ForegroundColor Cyan
 Write-Host "`n⚠️  IMPORTANT: Copy this URL - you'll need it in Step 2!" -ForegroundColor Red
@@ -169,6 +183,7 @@ $pacInfo = @{
     SASUrl = $sasUrl
     FirewallPrivateIP = $FirewallPrivateIP
     ProxyHttpPort = $ProxyHttpPort
+    ProxyHttpsPort = $ProxyHttpsPort
     ExpiryDate = (Get-Date).AddDays(7).ToString()
 } | ConvertTo-Json
 
