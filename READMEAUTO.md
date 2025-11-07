@@ -552,27 +552,66 @@ cd scripts
 
 **🎯 Validate PAC file routing logic**
 
-1. **On the Client VM**, test PAC file is accessible:
-   ```cmd
+1. **On the Client VM**, test PAC file is accessible from Azure Firewall:
+   ```powershell
    curl http://10.0.0.4:8090/proxy.pac
    ```
-   ✅ **Expected**: You should see the JavaScript PAC file content
+   ✅ **Expected**: HTTP 200 OK with `Content-Type: application/x-ns-proxy-autoconfig`
+   
+   **View the actual PAC file content**:
+   ```powershell
+   (curl http://10.0.0.4:8090/proxy.pac).Content
+   ```
+   ✅ **Expected**: You should see JavaScript function with `PROXY 10.0.0.4:8080` (or 8081)
 
-2. **Test routing**:
-   - Open **Microsoft Edge**
-   - Navigate to `http://www.microsoft.com` → Should work (routed via proxy per PAC logic)
-   - Navigate to `http://www.bing.com` → Should work (routed via proxy)
+2. **Verify Windows is using the PAC file**:
+   ```powershell
+   # Check registry setting
+   Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" | Select-Object AutoConfigURL, ProxyEnable
+   ```
+   ✅ **Expected**: 
+   - `AutoConfigURL` should show your SAS URL
+   - `ProxyEnable` should be `0` (manual proxy disabled)
 
-3. **Verify proxy resolution in PowerShell**:
+3. **Verify proxy resolution** (CRITICAL TEST):
    ```powershell
    [System.Net.WebRequest]::GetSystemWebProxy().GetProxy("http://www.microsoft.com")
    ```
-   ✅ **Expected**: Should show `http://10.0.0.4:8081` (or whatever HTTP port you configured)
+   ✅ **Expected**: Should show `http://10.0.0.4:8081` (or 8080)
+   
+   ❌ **If you see `http://www.microsoft.com/`** - PAC file is NOT active! 
+   
+   **Troubleshooting if PAC not active**:
+   ```powershell
+   # Force WinHTTP to use PAC from IE settings
+   netsh winhttp import proxy source=ie
+   
+   # Restart browser completely (close all windows)
+   Stop-Process -Name msedge -Force -ErrorAction SilentlyContinue
+   Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
+   
+   # Test again
+   [System.Net.WebRequest]::GetSystemWebProxy().GetProxy("http://www.microsoft.com")
+   ```
+   
+   **Common issues**:
+   - **SAS URL expired**: Check token expiry in Lab2-PAC-Info.json (valid 7 days)
+   - **SAS URL not accessible**: Verify storage account allows public blob access
+   - **Browser cache**: Close ALL browser windows and reopen
+   - **PAC file syntax error**: Verify PAC file content has valid JavaScript
+
+4. **Test browser routing**:
+   - Open **Microsoft Edge** (start fresh, close all existing windows first)
+   - Navigate to `http://www.microsoft.com` → Should work (routed via proxy per PAC logic)
+   - Navigate to `http://www.bing.com` → Should work (routed via proxy)
+   - Navigate to `http://www.google.com` → Should fail (blocked by firewall rules)
 
 **💡 What you learned:**
-- How to verify PAC file is being served by the firewall
-- PAC file routing logic execution
-- Troubleshooting PAC file issues
+- How to verify PAC file is being served by Azure Firewall on port 8090
+- Difference between PAC file accessibility and PAC file being actively used
+- How to verify Windows proxy resolution is using PAC file
+- Troubleshooting PAC file activation issues
+- Common PAC file configuration pitfalls
 
 ---
 
