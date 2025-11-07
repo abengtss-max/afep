@@ -1,5 +1,7 @@
 # Azure Firewall Explicit Proxy (AFEP) – Automated Infrastructure Guide
 
+> **📋 Having issues?** Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for diagnostic commands and solutions
+
 ## Introduction in Simple Terms
 
 Azure Firewall Explicit Proxy (AFEP) acts like a checkpoint for internet traffic in Azure. Instead of letting servers and apps go straight to the internet, AFEP makes them send traffic through Azure Firewall first, giving you control and visibility.
@@ -241,30 +243,59 @@ cd scripts
    - Click **Connect**
 
 2. **Configure Windows Proxy Settings** (on the VM):
+   
+   ⚠️ **CRITICAL**: You must configure BOTH HTTP and HTTPS proxy ports separately!
+   
+   **Option A: PowerShell (Recommended - Most Reliable)**
+   - Open **PowerShell as Administrator** on the VM
+   - Run these commands:
+     ```powershell
+     # Configure proxy for both HTTP and HTTPS
+     netsh winhttp set proxy proxy-server="http=10.0.0.4:8081;https=10.0.0.4:8443" bypass-list="<local>"
+     
+     # Configure for browsers (Internet Explorer/Edge)
+     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name ProxyServer -Value "http=10.0.0.4:8081;https=10.0.0.4:8443"
+     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name ProxyEnable -Value 1
+     
+     # Verify settings
+     netsh winhttp show proxy
+     ```
+   - You should see:
+     ```
+     Proxy Server(s) :  http=10.0.0.4:8081;https=10.0.0.4:8443
+     Bypass List     :  <local>
+     ```
+
+   **Option B: Windows Settings GUI** (Alternative method)
    - Press **Windows key + I** to open Settings
    - Click **Network & Internet** (left menu)
    - Scroll down and click **Proxy** (left menu)
    - Under **Manual proxy setup**:
      - Toggle **Use a proxy server** to **ON**
-     - **Address**: Enter the **Firewall Private IP** (check `Lab1-DeploymentInfo.json` or it's typically `10.0.0.4`)
-     - **Port**: `8081` (match the HTTP port you configured in Step 2)
+     - **Address**: `10.0.0.4` (Firewall Private IP from `Lab1-DeploymentInfo.json`)
+     - **Port**: `8081`
+     - ⚠️ **Note**: GUI only supports one port - use PowerShell method for full HTTPS support
      - Check **Don't use the proxy server for local (intranet) addresses**
      - Click **Save** button
 
-3. **Alternative: Configure using PowerShell** (on the VM):
-   - Open **PowerShell as Administrator**
-   - Run (replace IP and port if different):
+3. **Test the Configuration**:
+   - Open **PowerShell** on the VM
+   - Run this test command:
      ```powershell
-     netsh winhttp set proxy proxy-server="10.0.0.4:8081" bypass-list="<local>"
+     # Test HTTP through proxy
+     Invoke-WebRequest -Uri "http://www.microsoft.com" -Proxy "http://10.0.0.4:8081" -UseBasicParsing | Select-Object StatusCode
+     
+     # Test HTTPS through proxy  
+     Invoke-WebRequest -Uri "https://www.microsoft.com" -Proxy "http://10.0.0.4:8081" -UseBasicParsing | Select-Object StatusCode
      ```
-   - Verify:
-     ```powershell
-     netsh winhttp show proxy
-     ```
+   - Both should return `StatusCode : 200` (success)
+   - If you get **Error 470**, your application rules need to be updated (see TROUBLESHOOTING.md)
 
 **💡 What you learned:**
-- How to configure explicit proxy on Windows clients
-- Difference between GUI and command-line configuration
+- How to configure explicit proxy on Windows clients with separate HTTP/HTTPS ports
+- Difference between WinHTTP (system-wide) and IE/Edge registry settings
+- Why both ports (8081 for HTTP, 8443 for HTTPS) are required
+- Using PowerShell for reliable proxy configuration
 - Bypass lists for local traffic
 
 ---
