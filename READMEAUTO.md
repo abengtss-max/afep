@@ -308,35 +308,103 @@ cd scripts
 
 **🎯 Validate your AFEP setup works correctly**
 
-1. **On the Client VM**, open **Microsoft Edge** or **Internet Explorer**
-2. Test allowed sites:
-   - Navigate to `http://www.bing.com`
-     - ✅ **Expected**: Page loads successfully (allowed by firewall rule)
+1. **On the Client VM**, open **Microsoft Edge**
+2. **Test allowed sites:**
    - Navigate to `https://www.microsoft.com`
      - ✅ **Expected**: Page loads successfully (allowed by firewall rule)
-3. Test blocked site:
-   - Navigate to `http://www.google.com`
-     - ❌ **Expected**: Connection fails (not allowed by firewall rules)
+   - Navigate to `https://www.bing.com`
+     - ✅ **Expected**: Page loads successfully (allowed by firewall rule)
+   - Navigate to `http://www.example.com`
+     - ✅ **Expected**: Page loads successfully (allowed by firewall rule)
 
-4. **Verify in Azure Monitor Logs**:
-   - In Azure Portal, go to your Firewall resource (`afw-lab1`)
-   - Under **Monitoring**, click **Logs**
-   - Close the "Queries" popup if it appears
-   - Paste this query:
-     ```kusto
-     AzureDiagnostics
-     | where Category == "AzureFirewallApplicationRule"
-     | where TimeGenerated > ago(30m)
-     | project TimeGenerated, msg_s
-     | order by TimeGenerated desc
-     ```
-   - Click **Run** button
-   - Review the logs showing allowed/denied traffic
+3. **Test blocked site:**
+   - Navigate to `https://www.google.com`
+     - ❌ **Expected**: Connection fails with "ERR_TUNNEL_CONNECTION_FAILED" (not allowed by firewall rules)
+     - This confirms the firewall is blocking traffic as expected!
+
+**🎉 If the allowed sites work and Google is blocked, you've successfully completed Lab 1!**
+
+---
+
+#### 📊 Optional: View Firewall Logs
+
+**Note:** Diagnostic logging is **not enabled by default**. This is optional and not required for the lab.
+
+<details>
+<summary>Click to expand: Enable and view firewall logs</summary>
+
+**Why enable logs?**
+- See detailed traffic analysis (source IP, destination, action taken)
+- Troubleshoot rule matching issues
+- Audit and compliance requirements
+
+**Step 1: Enable Diagnostic Logging** (run on your local machine):
+
+```powershell
+# Install Az.Monitor module if needed
+Install-Module Az.Monitor -Force -AllowClobber -Scope CurrentUser
+
+# Create Log Analytics Workspace
+$workspace = New-AzOperationalInsightsWorkspace `
+    -Location "Sweden Central" `
+    -Name "law-afep-lab1" `
+    -ResourceGroupName "RG-AFEP-Lab1" `
+    -Sku "PerGB2018"
+
+# Wait for workspace to be ready
+Start-Sleep -Seconds 30
+
+# Enable firewall diagnostics
+$fw = Get-AzFirewall -Name "afw-lab1" -ResourceGroupName "RG-AFEP-Lab1"
+
+Set-AzDiagnosticSetting `
+    -Name "afep-diagnostics" `
+    -ResourceId $fw.Id `
+    -WorkspaceId $workspace.ResourceId `
+    -Enabled $true `
+    -Category @("AzureFirewallApplicationRule", "AzureFirewallNetworkRule")
+
+Write-Host "`n✅ Logging enabled! Wait 5-10 minutes for logs to appear" -ForegroundColor Green
+```
+
+**Step 2: Generate Traffic** (on the VM):
+- Browse to several websites (microsoft.com, bing.com, google.com)
+- Wait 5-10 minutes for logs to be ingested
+
+**Step 3: Query Logs** (in Azure Portal):
+- Go to Firewall → Monitoring → Logs
+- Run this query:
+
+```kusto
+AzureDiagnostics
+| where Category == "AzureFirewallApplicationRule"
+| where TimeGenerated > ago(30m)
+| where isnotempty(Message)
+| extend 
+    Action = extract("Action: ([A-Za-z]+)", 1, Message),
+    Protocol = extract("([A-Za-z]+) request", 1, Message),
+    SourceIP = extract("from ([0-9.]+):", 1, Message),
+    DestFQDN = extract("to ([^:]+):", 1, Message)
+| project TimeGenerated, Action, Protocol, SourceIP, DestFQDN, Message
+| order by TimeGenerated desc
+| take 50
+```
+
+**What you'll see:**
+- **Action: Allow** - Traffic permitted by rules
+- **Action: Deny** - Traffic blocked (like google.com)
+- Source IP will be your VM's private IP (10.0.2.4)
+- Destination will show the FQDN you tried to access
+
+</details>
+
+---
 
 **💡 What you learned:**
 - How to test explicit proxy functionality
-- Expected behavior for allowed vs blocked sites
-- How to monitor and troubleshoot using Azure Monitor logs
+- Expected behavior for allowed vs blocked sites  
+- Difference between allowed and denied traffic
+- (Optional) How to enable and query firewall logs for troubleshooting
 
 ---
 
