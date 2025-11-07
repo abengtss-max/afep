@@ -491,12 +491,48 @@ cd scripts
 **🎯 Learn automatic proxy configuration**
 
 1. **RDP into your Client VM** (`vm-client-lab1`)
-2. **Remove manual proxy settings first**:
+
+2. **Remove manual proxy settings from Lab 1**:
+   
+   **Option A: Using PowerShell (Recommended)**
+   ```powershell
+   # Remove manual proxy settings
+   netsh winhttp reset proxy
+   
+   # Clear Internet Explorer/Edge proxy settings
+   reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f
+   reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /f
+   
+   # Disable automatic detection
+   reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
+   
+   # Clear any existing PAC file URL
+   reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoConfigURL /f
+   
+   Write-Host "✅ Manual proxy configuration cleared" -ForegroundColor Green
+   ```
+   
+   **Option B: Using Windows Settings (GUI)**
    - Press **Windows key + I** → **Network & Internet** → **Proxy**
    - Under **Manual proxy setup**, toggle **Use a proxy server** to **OFF**
    - Click **Save**
 
 3. **Configure automatic proxy using PAC**:
+   
+   **Option A: Using PowerShell (Recommended)**
+   ```powershell
+   # Replace with your actual SAS URL from Lab2-PAC-Info.json
+   $pacUrl = "YOUR_SAS_URL_HERE"
+   
+   # Enable PAC file
+   reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoConfigURL /t REG_SZ /d $pacUrl /f
+   reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v AutoDetect /t REG_DWORD /d 0 /f
+   
+   Write-Host "✅ PAC file configured: $pacUrl" -ForegroundColor Green
+   Write-Host "⚠️  Close and reopen browser for changes to take effect" -ForegroundColor Yellow
+   ```
+   
+   **Option B: Using Windows Settings (GUI)**
    - Still in **Proxy** settings
    - Under **Automatic proxy setup**:
      - Toggle **Automatically detect settings** to **OFF**
@@ -508,6 +544,7 @@ cd scripts
 - Difference between manual proxy and automatic (PAC) configuration
 - How clients retrieve and use PAC files
 - PAC file provides dynamic proxy routing
+- PowerShell automation for proxy configuration
 
 ---
 
