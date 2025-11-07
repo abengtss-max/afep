@@ -41,9 +41,28 @@ $storageAccount = New-AzStorageAccount `
     -Location $rg.Location `
     -SkuName Standard_LRS `
     -Kind StorageV2 `
-    -AllowBlobPublicAccess $false
+    -AllowBlobPublicAccess $true `
+    -AllowSharedKeyAccess $true
 
 Write-Host "✅ Storage Account created" -ForegroundColor Green
+
+# Assign Storage Blob Data Contributor role to current user for Entra ID authentication
+Write-Host "`n🔑 Assigning Storage Blob Data Contributor role..." -ForegroundColor Yellow
+$currentUser = (Get-AzContext).Account.Id
+try {
+    New-AzRoleAssignment `
+        -ObjectId (Get-AzADUser -UserPrincipalName $currentUser).Id `
+        -RoleDefinitionName "Storage Blob Data Contributor" `
+        -Scope $storageAccount.Id `
+        -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "✅ Role assignment complete" -ForegroundColor Green
+    Start-Sleep -Seconds 10  # Wait for role assignment to propagate
+} catch {
+    Write-Host "⚠️  Role may already be assigned (this is okay)" -ForegroundColor Yellow
+}
+
+# Get storage account context using Entra ID authentication (works even if key auth is disabled)
+$ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -UseConnectedAccount
 
 # 3. Create Container
 Write-Host "`n📁 Creating blob container 'pacfiles'..." -ForegroundColor Yellow
@@ -85,10 +104,6 @@ Write-Host "✅ PAC file created locally" -ForegroundColor Green
 # 5. Upload PAC File
 Write-Host "`n⬆️  Uploading PAC file to blob storage..." -ForegroundColor Yellow
 
-# Get fresh storage account keys and context
-$keys = Get-AzStorageAccountKey -ResourceGroupName $ResourceGroupName -Name $StorageAccountName
-$ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $keys[0].Value
-
 $blob = Set-AzStorageBlobContent `
     -File $pacFile `
     -Container "pacfiles" `
@@ -98,22 +113,34 @@ $blob = Set-AzStorageBlobContent `
 
 Write-Host "✅ PAC file uploaded" -ForegroundColor Green
 
-# 6. Generate SAS Token
+# 6. Generate SAS Token with User Delegation (Entra ID-based)
 Write-Host "`n🔑 Generating SAS token (valid for 7 days)..." -ForegroundColor Yellow
 
 # Use UTC time for SAS token
 $startTime = (Get-Date).ToUniversalTime()
 $expiryTime = $startTime.AddDays(7)
 
+# Get user delegation key (required for Entra ID-based SAS)
+$userDelegationKey = Get-AzStorageAccountUserDelegationKey `
+    -Context $ctx `
+    -StartTime $startTime `
+    -ExpiryTime $expiryTime
+
+# Generate SAS token using user delegation key
 $sasToken = New-AzStorageBlobSASToken `
     -Container "pacfiles" `
     -Blob "proxy.pac" `
     -Permission "r" `
     -StartTime $startTime `
     -ExpiryTime $expiryTime `
-    -Context $ctx
+    -Context $ctx `
+    -Protocol Https `
+    -FullUri
 
-$sasUrl = $blob.ICloudBlob.Uri.AbsoluteUri + $sasToken
+Write-Host "✅ SAS token generated" -ForegroundColor Green
+
+# The $sasToken already contains the full URL when using -FullUri parameter
+$sasUrl = $sasToken
 
 Write-Host "✅ SAS token generated" -ForegroundColor Green
 
