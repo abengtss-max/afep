@@ -282,14 +282,18 @@ cd scripts
    - Open **PowerShell** on the VM
    - Run this test command:
      ```powershell
-     # Test HTTP through proxy
-     Invoke-WebRequest -Uri "http://www.microsoft.com" -Proxy "http://10.0.0.4:8081" -UseBasicParsing | Select-Object StatusCode
+     # Verify proxy settings are applied
+     netsh winhttp show proxy
      
-     # Test HTTPS through proxy  
-     Invoke-WebRequest -Uri "https://www.microsoft.com" -Proxy "http://10.0.0.4:8081" -UseBasicParsing | Select-Object StatusCode
+     # Test HTTP through proxy (uses port 8081)
+     Invoke-WebRequest -Uri "http://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
+     
+     # Test HTTPS through proxy (uses port 8443 automatically when configured correctly)
+     Invoke-WebRequest -Uri "https://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
      ```
    - Both should return `StatusCode : 200` (success)
    - If you get **Error 470**, your application rules need to be updated (see TROUBLESHOOTING.md)
+   - If you get connection errors, verify both ports 8081 and 8443 are configured
 
 **💡 What you learned:**
 - How to configure explicit proxy on Windows clients with separate HTTP/HTTPS ports

@@ -462,12 +462,18 @@ Test-NetConnection -ComputerName 10.0.0.4 -Port 8443
 # Check proxy settings
 netsh winhttp show proxy
 
-# Set correct proxy
+# Set correct proxy (protocol-specific format)
 netsh winhttp set proxy proxy-server="http=10.0.0.4:8081;https=10.0.0.4:8443" bypass-list="<local>"
 
-# Test proxy functionality
-Invoke-WebRequest -Uri "https://www.microsoft.com" -Proxy "http://10.0.0.4:8081" -UseBasicParsing
+# Test proxy functionality (will use appropriate port based on URL scheme)
+# HTTP test - uses port 8081
+Invoke-WebRequest -Uri "http://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
+
+# HTTPS test - uses port 8443 automatically
+Invoke-WebRequest -Uri "https://www.microsoft.com" -UseBasicParsing | Select-Object StatusCode
 ```
+
+**Note**: When proxy is configured with protocol-specific format (`http=IP:8081;https=IP:8443`), PowerShell automatically uses the correct port based on the URL scheme (http:// vs https://). You don't need to specify `-Proxy` parameter explicitly.
 
 ---
 
