@@ -12,7 +12,7 @@ param(
     [string]$FirewallPrivateIP = "10.0.0.4",
     
     [Parameter(Mandatory=$false)]
-    [int]$ProxyHttpPort = 8081
+    [int]$ProxyHttpPort = 8443
 )
 
 Write-Host "🚀 Starting Lab 2 PAC File Infrastructure Setup..." -ForegroundColor Cyan
