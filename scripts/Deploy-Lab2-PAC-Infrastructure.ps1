@@ -9,7 +9,10 @@ param(
     [string]$StorageAccountName = "afepstorage$(Get-Random -Maximum 99999)",
     
     [Parameter(Mandatory=$false)]
-    [string]$FirewallPrivateIP = "10.0.0.4"
+    [string]$FirewallPrivateIP = "10.0.0.4",
+    
+    [Parameter(Mandatory=$false)]
+    [int]$ProxyHttpPort = 8081
 )
 
 Write-Host "🚀 Starting Lab 2 PAC File Infrastructure Setup..." -ForegroundColor Cyan
@@ -78,7 +81,7 @@ Write-Host "✅ Container created" -ForegroundColor Green
 Write-Host "`n📝 Creating PAC file..." -ForegroundColor Yellow
 
 # Create PAC content with variable expansion
-$proxyServer = "${FirewallPrivateIP}:8080"
+$proxyServer = "${FirewallPrivateIP}:${ProxyHttpPort}"
 $pacContent = @"
 function FindProxyForURL(url, host) {
     // Internal domains go direct (bypass proxy)
@@ -148,6 +151,7 @@ Write-Host "  Storage Account: $StorageAccountName"
 Write-Host "  Container: pacfiles"
 Write-Host "  Blob Name: proxy.pac"
 Write-Host "  Firewall IP in PAC: $FirewallPrivateIP"
+Write-Host "  Proxy Port in PAC: $ProxyHttpPort"
 Write-Host "`n🔗 PAC File SAS URL:" -ForegroundColor Yellow
 Write-Host "  $sasUrl" -ForegroundColor Cyan
 Write-Host "`n⚠️  IMPORTANT: Copy this URL - you'll need it in Step 2!" -ForegroundColor Red
@@ -164,6 +168,7 @@ $pacInfo = @{
     BlobName = "proxy.pac"
     SASUrl = $sasUrl
     FirewallPrivateIP = $FirewallPrivateIP
+    ProxyHttpPort = $ProxyHttpPort
     ExpiryDate = (Get-Date).AddDays(7).ToString()
 } | ConvertTo-Json
 
