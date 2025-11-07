@@ -165,35 +165,60 @@ cd scripts
 
 1. From the Firewall Policy page (`afp-lab1`), under **Settings**, click **Application Rules**
 2. Click **+ Add a rule collection** button
-3. Fill in the **Rule collection** settings:
-   - **Name**: `AllowWebTraffic`
-   - **Rule collection type**: **Application**
-   - **Priority**: `200` (lower number = higher priority)
-   - **Rule collection action**: **Allow**
-   - **Rule collection group**: Select **DefaultApplicationRuleCollectionGroup**
-4. Under **Rules**, add first rule:
-   - **Name**: `AllowMicrosoft`
-   - **Source type**: **IP Address**
-   - **Source**: `*` (or specific subnet like `10.0.2.0/24`)
-   - **Protocol**: `http:80,https:443`
-   - **Destination type**: **FQDN**
-   - **Destination**: `*.microsoft.com`
-5. Click **Add** button to add another rule:
-   - **Name**: `AllowBing`
-   - **Source type**: **IP Address**
-   - **Source**: `*`
-   - **Protocol**: `http:80,https:443`
-   - **Destination type**: **FQDN**
-   - **Destination**: `www.bing.com`
-6. Click **Add** button to add another rule:
-   - **Name**: `AllowTestSites`
-   - **Source type**: **IP Address**
-   - **Source**: `*`
-   - **Protocol**: `http:80,https:443`
-   - **Destination type**: **FQDN**
-   - **Destination**: `www.example.com,httpbin.org`
-7. Click **Add** button (bottom of page)
-8. Wait for "Successfully added rule collection" (~1-2 minutes)
+3. **Fill in the Rule collection settings** (top section):
+   
+   | Field | Value | Notes |
+   |-------|-------|-------|
+   | **Name** | `AllowWebTraffic` | Any descriptive name |
+   | **Rule collection type** | `Application` | ⚠️ Must be Application (dropdown) |
+   | **Priority** | `200` | Lower = higher priority (100-65000) |
+   | **Rule collection action** | `Allow` | Select from dropdown |
+   | **Rule collection group** | `DefaultApplicationRuleCollectionGroup` | Select from dropdown |
+
+4. **Add first rule** (in the Rules section below):
+   
+   | Field | Value | Notes |
+   |-------|-------|-------|
+   | **Name** | `AllowMicrosoft` | Leave blank or name it |
+   | **Source type** | `IP Address` | Select from dropdown |
+   | **Source** | `*` | Asterisk means any source (or use `192.168.0.0/16` for private IPs) |
+   | **Protocol** | `http:80,https:443` | Type exactly as shown (port format is protocol:port) |
+   | **TLS inspection** | ☐ Unchecked | Leave unchecked (requires Premium) |
+   | **Destination Type** | `FQDN` | Select from dropdown |
+   | **Destination** | `*.microsoft.com` | Wildcard allows all microsoft.com subdomains |
+
+5. Click **+ Add** button (in the Rules section) to add a second rule:
+   
+   | Field | Value |
+   |-------|-------|
+   | **Name** | `AllowBing` |
+   | **Source type** | `IP Address` |
+   | **Source** | `*` |
+   | **Protocol** | `http:80,https:443` |
+   | **TLS inspection** | ☐ Unchecked |
+   | **Destination Type** | `FQDN` |
+   | **Destination** | `www.bing.com` |
+
+6. Click **+ Add** button again to add a third rule:
+   
+   | Field | Value | Notes |
+   |-------|-------|-------|
+   | **Name** | `AllowTestSites` | Optional name |
+   | **Source type** | `IP Address` |
+   | **Source** | `*` |
+   | **Protocol** | `http:80,https:443` |
+   | **TLS inspection** | ☐ Unchecked |
+   | **Destination Type** | `FQDN` |
+   | **Destination** | `www.example.com,httpbin.org` | Comma-separated list |
+
+7. Click **Add** button (bottom of dialog - this saves the entire rule collection)
+8. Wait for "Successfully added rule collection" notification (~1-2 minutes)
+
+**🔍 Quick Validation:**
+- Your screen should show 3 rules in the Rules section before clicking final Add
+- Protocol format must be `http:80,https:443` (not just "http" or "https")
+- Source `*` means all IPs (or use `10.0.2.0/24` to match your VM subnet exactly)
+- Don't click Add at the bottom until all 3 rules are configured
 
 **💡 What you learned:**
 - Application rules are required for explicit proxy (not network rules)
