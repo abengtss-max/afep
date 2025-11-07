@@ -76,6 +76,9 @@ Write-Host "✅ Container created" -ForegroundColor Green
 
 # 4. Create PAC File
 Write-Host "`n📝 Creating PAC file..." -ForegroundColor Yellow
+
+# Create PAC content with variable expansion
+$proxyServer = "${FirewallPrivateIP}:8080"
 $pacContent = @"
 function FindProxyForURL(url, host) {
     // Internal domains go direct (bypass proxy)
@@ -88,11 +91,11 @@ function FindProxyForURL(url, host) {
     // Microsoft services go through proxy
     if (dnsDomainIs(host, ".microsoft.com") || 
         dnsDomainIs(host, ".bing.com")) {
-        return "PROXY $FirewallPrivateIP:8080";
+        return "PROXY $proxyServer";
     }
     
     // All other traffic goes through proxy
-    return "PROXY $FirewallPrivateIP:8080";
+    return "PROXY $proxyServer";
 }
 "@
 
