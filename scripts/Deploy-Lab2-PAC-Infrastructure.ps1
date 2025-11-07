@@ -113,20 +113,14 @@ $blob = Set-AzStorageBlobContent `
 
 Write-Host "✅ PAC file uploaded" -ForegroundColor Green
 
-# 6. Generate SAS Token with User Delegation (Entra ID-based)
+# 6. Generate SAS Token
 Write-Host "`n🔑 Generating SAS token (valid for 7 days)..." -ForegroundColor Yellow
 
 # Use UTC time for SAS token
 $startTime = (Get-Date).ToUniversalTime()
 $expiryTime = $startTime.AddDays(7)
 
-# Get user delegation key (required for Entra ID-based SAS)
-$userDelegationKey = Get-AzStorageAccountUserDelegationKey `
-    -Context $ctx `
-    -StartTime $startTime `
-    -ExpiryTime $expiryTime
-
-# Generate SAS token using user delegation key
+# Generate SAS token with Entra ID context (works with -UseConnectedAccount)
 $sasToken = New-AzStorageBlobSASToken `
     -Container "pacfiles" `
     -Blob "proxy.pac" `
@@ -134,10 +128,8 @@ $sasToken = New-AzStorageBlobSASToken `
     -StartTime $startTime `
     -ExpiryTime $expiryTime `
     -Context $ctx `
-    -Protocol Https `
+    -Protocol HttpsOnly `
     -FullUri
-
-Write-Host "✅ SAS token generated" -ForegroundColor Green
 
 # The $sasToken already contains the full URL when using -FullUri parameter
 $sasUrl = $sasToken
