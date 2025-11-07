@@ -84,6 +84,11 @@ Write-Host "✅ PAC file created locally" -ForegroundColor Green
 
 # 5. Upload PAC File
 Write-Host "`n⬆️  Uploading PAC file to blob storage..." -ForegroundColor Yellow
+
+# Get fresh storage account keys and context
+$keys = Get-AzStorageAccountKey -ResourceGroupName $ResourceGroupName -Name $StorageAccountName
+$ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $keys[0].Value
+
 $blob = Set-AzStorageBlobContent `
     -File $pacFile `
     -Container "pacfiles" `
@@ -95,11 +100,17 @@ Write-Host "✅ PAC file uploaded" -ForegroundColor Green
 
 # 6. Generate SAS Token
 Write-Host "`n🔑 Generating SAS token (valid for 7 days)..." -ForegroundColor Yellow
+
+# Use UTC time for SAS token
+$startTime = (Get-Date).ToUniversalTime()
+$expiryTime = $startTime.AddDays(7)
+
 $sasToken = New-AzStorageBlobSASToken `
     -Container "pacfiles" `
     -Blob "proxy.pac" `
     -Permission "r" `
-    -ExpiryTime (Get-Date).AddDays(7) `
+    -StartTime $startTime `
+    -ExpiryTime $expiryTime `
     -Context $ctx
 
 $sasUrl = $blob.ICloudBlob.Uri.AbsoluteUri + $sasToken
