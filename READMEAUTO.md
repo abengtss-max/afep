@@ -18,7 +18,24 @@ Azure Firewall Explicit Proxy (AFEP) acts like a checkpoint for internet traffic
 ⚠️ **Azure Firewall Explicit Proxy is currently in Public Preview**  
 ⚠️ **AzureFirewallSubnet must be exactly /26** (64 IP addresses) - This is mandatory for proper scaling  
 ⚠️ **Application rules must be used** - Network rules will not work with explicit proxy  
-⚠️ **HTTP and HTTPS ports cannot be the same**
+⚠️ **HTTP and HTTPS ports cannot be the same**  
+⚠️ **Port 8080 may be blocked** - Some Azure regions/policies restrict port 8080 during preview. Use **8081** or **8082** instead
+
+### Port Configuration (Important!)
+
+**Why not standard ports 80/443?**
+- Ports **80/443** are reserved for **transparent proxy mode** (different feature)
+- Explicit proxy requires **separate ports** to handle proxy protocol
+
+**Recommended ports:**
+- **HTTP**: `8081` or `8082` (8080 is often blocked in preview)
+- **HTTPS**: `8443` (standard, works reliably)
+- **PAC file**: `8090` (for Lab 2 & 3)
+
+**Why port 8080 doesn't work:**
+- Preview feature limitation in some Azure regions
+- Corporate/subscription policies may block common proxy ports
+- Use 8081 or 8082 as alternatives - they work consistently
 
 ### What's Automated vs Manual
 
@@ -127,9 +144,10 @@ cd scripts
 4. In the left menu under **Settings**, click **Explicit Proxy (Preview)**
 5. Click the **Enable Explicit Proxy** toggle switch to **ON**
 6. Configure the ports:
-   - **HTTP Port**: `8080` (standard HTTP proxy port)
+   - **HTTP Port**: `8081` ⚠️ **Note**: Port 8080 may be blocked in some regions - use 8081 or 8082 if 8080 fails
    - **HTTPS Port**: `8443` (standard HTTPS proxy port)
    - ⚠️ **Important**: HTTP and HTTPS ports CANNOT be the same
+   - ℹ️ **Port restrictions**: Avoid standard ports (80, 443) as they're reserved for transparent proxy mode
 7. Leave **Enable proxy auto-configuration** unchecked (we'll do this in Lab 2)
 8. Click **Apply** button (top of page)
 9. Wait for "Update succeeded" notification (~30 seconds)
@@ -204,15 +222,15 @@ cd scripts
    - Under **Manual proxy setup**:
      - Toggle **Use a proxy server** to **ON**
      - **Address**: Enter the **Firewall Private IP** (check `Lab1-DeploymentInfo.json` or it's typically `10.0.0.4`)
-     - **Port**: `8080`
+     - **Port**: `8081` (match the HTTP port you configured in Step 2)
      - Check **Don't use the proxy server for local (intranet) addresses**
      - Click **Save** button
 
 3. **Alternative: Configure using PowerShell** (on the VM):
    - Open **PowerShell as Administrator**
-   - Run (replace IP if different):
+   - Run (replace IP and port if different):
      ```powershell
-     netsh winhttp set proxy proxy-server="10.0.0.4:8080" bypass-list="<local>"
+     netsh winhttp set proxy proxy-server="10.0.0.4:8081" bypass-list="<local>"
      ```
    - Verify:
      ```powershell
@@ -384,7 +402,7 @@ cd scripts
    ```powershell
    [System.Net.WebRequest]::GetSystemWebProxy().GetProxy("http://www.microsoft.com")
    ```
-   ✅ **Expected**: Should show `http://10.0.0.4:8080`
+   ✅ **Expected**: Should show `http://10.0.0.4:8081` (or whatever HTTP port you configured)
 
 **💡 What you learned:**
 - How to verify PAC file is being served by the firewall
@@ -748,7 +766,7 @@ Write-Host "`n💾 Deployment info saved to: Lab3-DeploymentInfo.json" -Foregrou
    - Navigate to Firewall `afw-hub` → **Firewall Policy** → `afp-hub-policy`
    - Click **Explicit Proxy (Preview)**
    - **Enable Explicit Proxy**: ON
-   - **HTTP Port**: `8080`
+   - **HTTP Port**: `8081` (use 8081 or 8082 if 8080 is blocked in your region)
    - **HTTPS Port**: `8443`
    - **Enable proxy auto-configuration**: ON
    - **PAC file URL**: Your SAS URL
