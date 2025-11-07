@@ -14,6 +14,18 @@ param(
 
 Write-Host "🚀 Starting Lab 2 PAC File Infrastructure Setup..." -ForegroundColor Cyan
 
+# Check and install required modules
+Write-Host "`n🔍 Checking required Azure PowerShell modules..." -ForegroundColor Yellow
+$requiredModules = @('Az.Storage')
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module)) {
+        Write-Host "   Installing $module..." -ForegroundColor Cyan
+        Install-Module -Name $module -Force -AllowClobber -Scope CurrentUser
+    }
+    Import-Module $module -ErrorAction Stop
+}
+Write-Host "✅ All required modules loaded" -ForegroundColor Green
+
 # 1. Get Resource Group
 $rg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
 if (-not $rg) {
