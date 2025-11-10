@@ -1,0 +1,8 @@
+{
+  "Container": "pacfiles",
+  "ExpiryDate": "2025-11-14 09:22:52",
+  "SASUrl": "sv=2025-07-05&st=2025-11-07T08%3A22%3A52Z&se=2025-11-14T08%3A22%3A52Z&sr=b&sp=r&sig=GwAv8HUAtW8FSrHaxuYH7Z1mysITbEQ0b1B0T2Q0uUQ%3D",
+  "StorageAccount": "afepstorage17814",
+  "FirewallPrivateIP": "10.0.0.4",
+  "BlobName": "proxy.pac"
+}

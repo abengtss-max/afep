@@ -1,0 +1,10 @@
+{
+  "FirewallPrivateIP": "10.0.0.4",
+  "ProxyHttpPort": 8081,
+  "Container": "pacfiles",
+  "ExpiryDate": "2025-11-14 12:20:12",
+  "SASUrl": "https://afepstorage1689.blob.core.windows.net/pacfiles/proxy.pac?sv=2025-07-05&spr=https&st=2025-11-07T11%3A20%3A12Z&se=2025-11-14T11%3A20%3A12Z&sr=b&sp=r&sig=D2Jje%2F6l7e5l2ht9asQQZ2n7us3QUyRSzI5cbPp6hDg%3D",
+  "StorageAccount": "afepstorage1689",
+  "ProxyHttpsPort": 8443,
+  "BlobName": "proxy.pac"
+}

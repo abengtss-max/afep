@@ -1,0 +1,8 @@
+{
+  "Location": "Sweden Central",
+  "FirewallPolicyId": "/subscriptions/b67d7073-183c-499f-aaa9-bbb4986dedf1/resourceGroups/RG-AFEP-Lab1/providers/Microsoft.Network/firewallPolicies/afp-lab1",
+  "FirewallPublicIP": "20.91.227.159",
+  "FirewallPrivateIP": "10.0.0.4",
+  "ClientVMPublicIP": "4.223.124.129",
+  "ResourceGroup": "RG-AFEP-Lab1"
+}

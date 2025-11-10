@@ -1,0 +1,9 @@
+{
+  "Location": "Sweden Central",
+  "FirewallPolicyId": "/subscriptions/b67d7073-183c-499f-aaa9-bbb4986dedf1/resourceGroups/RG-AFEP-HubSpoke/providers/Microsoft.Network/firewallPolicies/afp-hub-policy",
+  "FirewallPublicIP": "4.225.205.70",
+  "FirewallPrivateIP": "10.0.0.4",
+  "Spoke2VMPublicIP": "74.241.245.24",
+  "Spoke1VMPublicIP": "20.91.249.54",
+  "ResourceGroup": "RG-AFEP-HubSpoke"
+}
