@@ -205,7 +205,9 @@ If **False**, you need to enable it in BIOS:
 4. Enable it
 5. Save and exit
 
-### Install Hyper-V Feature
+### Install Hyper-V Feature (Choose ONE Method)
+
+**Method 1: PowerShell (Recommended)**
 
 ```powershell
 # Open PowerShell as Administrator
@@ -217,14 +219,34 @@ Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
 Restart-Computer
 ```
 
-After restart, verify installation:
+**Method 2: GUI (Settings)**
+
+1. Press `Windows + R`
+2. Type: `optionalfeatures` and press Enter
+3. Scroll down and check **Hyper-V**
+4. Expand Hyper-V and ensure these are checked:
+   - ✅ Hyper-V Management Tools
+   - ✅ Hyper-V Platform
+5. Click "OK"
+6. Restart when prompted
+
+### Verify Installation
+
+After restart, open PowerShell and run:
 
 ```powershell
-# Open PowerShell
+# Verify Hyper-V is enabled
 Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V
 ```
 
 Should show: **State : Enabled**
+
+```powershell
+# Launch Hyper-V Manager to confirm GUI works
+virtmgmt.msc
+```
+
+Hyper-V Manager window should open. You'll use this GUI frequently.
 
 ---
 
@@ -266,25 +288,41 @@ Should see:
 
 ## 📝 Step 3: Create pfSense Firewall VM
 
-### Create VM
+You can use **PowerShell** (faster) or **Hyper-V Manager GUI** (more visual). Choose one method.
+
+### Method 1: PowerShell (Recommended - Faster)
 
 ```powershell
-# Create VM
-New-VM -Name "pfSense-Lab" -MemoryStartupBytes 1GB -Generation 1 -Path "C:\Hyper-V"
+# Open PowerShell as Administrator
 
-# Add network adapters (2 NICs)
-Add-VMNetworkAdapter -VMName "pfSense-Lab" -SwitchName "External"  # WAN
-Add-VMNetworkAdapter -VMName "pfSense-Lab" -SwitchName "Internal-Lab"  # LAN
+# Create VM folder
+New-Item -Path "C:\Hyper-V\pfSense-Lab" -ItemType Directory -Force
 
-# Add DVD drive and mount pfSense ISO
+# Create virtual hard disk first
+New-VHD -Path "C:\Hyper-V\pfSense-Lab\pfSense-Lab.vhdx" -SizeBytes 8GB -Dynamic
+
+# Create VM (Generation 1 for FreeBSD compatibility)
+New-VM -Name "pfSense-Lab" `
+       -MemoryStartupBytes 1GB `
+       -Generation 1 `
+       -BootDevice CD `
+       -VHDPath "C:\Hyper-V\pfSense-Lab\pfSense-Lab.vhdx" `
+       -Path "C:\Hyper-V"
+
+# Add second network adapter (VM has 1 by default, we need 2 total)
+Add-VMNetworkAdapter -VMName "pfSense-Lab" -SwitchName "Internal-Lab"
+
+# Connect first adapter to External (WAN)
+Get-VMNetworkAdapter -VMName "pfSense-Lab" | Select-Object -First 1 | Connect-VMNetworkAdapter -SwitchName "External"
+
+# Mount pfSense ISO
 Set-VMDvdDrive -VMName "pfSense-Lab" -Path "C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso"
 
-# Create virtual hard disk
-New-VHD -Path "C:\Hyper-V\pfSense-Lab\pfSense-Lab.vhdx" -SizeBytes 8GB -Dynamic
-Add-VMHardDiskDrive -VMName "pfSense-Lab" -Path "C:\Hyper-V\pfSense-Lab\pfSense-Lab.vhdx"
-
 # Disable Secure Boot (required for pfSense)
-Set-VMFirmware -VMName "pfSense-Lab" -EnableSecureBoot Off
+Set-VMFirmware -VMName "pfSense-Lab" -EnableSecureBoot Off -ErrorAction SilentlyContinue
+
+# Disable checkpoints (saves disk space)
+Set-VM -Name "pfSense-Lab" -CheckpointType Disabled
 
 # Start VM
 Start-VM -Name "pfSense-Lab"
@@ -293,82 +331,364 @@ Start-VM -Name "pfSense-Lab"
 vmconnect localhost "pfSense-Lab"
 ```
 
-### Install pfSense
+### Method 2: Hyper-V Manager GUI (Step-by-Step)
 
-1. **Boot from ISO** - Should start automatically
-2. **Accept:** Copyright and distribution notice (Enter)
-3. **Install:** Choose "Install pfSense" (Enter)
-4. **Keymap:** Select "US" or your keyboard layout
-5. **Partitioning:** Choose "Auto (ZFS)" → Proceed with installation
-6. **ZFS Configuration:**
-   - Select "Install" (Stripe - no redundancy)
-   - Select your virtual hard disk
-   - Confirm: "YES" (will erase disk)
-7. **Wait:** Installation takes 2-3 minutes
-8. **Reboot:** Choose "Reboot" when prompted
-9. **Remove ISO:** In Hyper-V Manager, eject the DVD
+1. **Open Hyper-V Manager:**
+   - Press `Windows + R`
+   - Type: `virtmgmt.msc` and press Enter
 
-### Initial Configuration
+2. **New Virtual Machine Wizard:**
+   - Right-click your computer name → **New** → **Virtual Machine**
+   - Click "Next"
 
-After reboot, pfSense will detect interfaces:
+3. **Specify Name and Location:**
+   - Name: `pfSense-Lab`
+   - Location: `C:\Hyper-V` (or leave default)
+   - Click "Next"
+
+4. **Specify Generation:**
+   - Select: **Generation 1** (pfSense requires this)
+   - Click "Next"
+
+5. **Assign Memory:**
+   - Startup memory: `1024` MB
+   - Uncheck "Use Dynamic Memory"
+   - Click "Next"
+
+6. **Configure Networking:**
+   - Connection: Select **External** (this will be WAN)
+   - Click "Next"
+
+7. **Connect Virtual Hard Disk:**
+   - Select: "Create a virtual hard disk"
+   - Name: `pfSense-Lab.vhdx`
+   - Location: `C:\Hyper-V\pfSense-Lab\`
+   - Size: `8` GB
+   - Click "Next"
+
+8. **Installation Options:**
+   - Select: "Install an operating system from a bootable image file"
+   - Click "Browse" → Navigate to `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso`
+   - Click "Next"
+
+9. **Completing Wizard:**
+   - Review settings
+   - Click "Finish"
+
+10. **Add Second Network Adapter (LAN):**
+    - Right-click "pfSense-Lab" → **Settings**
+    - Click "Add Hardware" → Select **Network Adapter** → Click "Add"
+    - Virtual Switch: Select **Internal-Lab**
+    - Click "OK"
+
+11. **Disable Checkpoints (Optional but Recommended):**
+    - Right-click "pfSense-Lab" → **Settings**
+    - Select "Checkpoints" (left menu)
+    - Uncheck "Enable checkpoints"
+    - Click "OK"
+
+12. **Start VM:**
+    - Right-click "pfSense-Lab" → **Connect**
+    - In console window, click **Start**
+
+### Install pfSense (In VM Console)
+
+The VM console should now show pfSense boot menu. Follow these steps:
+
+1. **Boot Menu:**
+   - Wait for boot menu (or press Enter)
+   - pfSense will start loading (takes 30-60 seconds)
+
+2. **Copyright Notice:**
+   - You'll see a copyright and distribution notice
+   - Press **Enter** to accept
+
+3. **Welcome Screen:**
+   ```
+   Welcome to pfSense!
+   
+   Install pfSense
+   Rescue Shell
+   Recover config.xml
+   ```
+   - Use arrow keys to select **Install pfSense**
+   - Press **Enter**
+
+4. **Keymap Selection:**
+   ```
+   Select a Keymap
+   >>> Continue with default keymap
+       Test keymap
+       Select keymap from list
+   ```
+   - Press **Enter** to use default (US keymap)
+   - Or select your keyboard layout if different
+
+5. **Partitioning:**
+   ```
+   Partitioning
+   >>> Auto (ZFS)
+       Shell
+       Auto (UFS) BIOS
+       Auto (UFS) UEFI
+       Manual
+   ```
+   - Select **Auto (ZFS)**
+   - Press **Enter**
+
+6. **ZFS Configuration - Installation Type:**
+   ```
+   >>> Install - Proceed with installation
+       Shell - Open a shell for manual setup
+   ```
+   - Select **Install**
+   - Press **Enter**
+
+7. **ZFS Configuration - Pool Type:**
+   ```
+   >>> stripe - No redundancy
+       mirror - N-Way mirroring
+       raid10 - Striped mirror
+   ```
+   - Select **stripe** (we only have 1 disk)
+   - Press **Space** to select
+   - Press **Enter**
+
+8. **Select Disk:**
+   ```
+   [ ] ada0    8.0 GB
+   ```
+   - Press **Space** to select the disk (shows [X])
+   - Press **Enter**
+
+9. **Confirmation:**
+   ```
+   !!! WARNING - THIS WILL ERASE THE DISK !!!
+   
+   Are you sure?
+   No / Yes
+   ```
+   - Select **Yes**
+   - Press **Enter**
+
+10. **Installation Progress:**
+    - Installation will begin (takes 2-3 minutes)
+    - You'll see progress: Extracting files, configuring system
+    - Wait for completion message
+
+11. **Installation Complete:**
+    ```
+    Installation Complete!
+    
+    Manual Configuration
+    Reboot
+    ```
+    - Select **Reboot**
+    - Press **Enter**
+
+12. **Eject ISO (Important!):**
+    - **In Hyper-V Manager:** Right-click "pfSense-Lab" → Settings
+    - Select "DVD Drive" → Select "None"
+    - Click "OK"
+    - This ensures VM boots from hard disk, not ISO
+
+### Initial Configuration (After Reboot)
+
+After reboot (takes 30-60 seconds), you'll see the pfSense console menu.
+
+**Interface Assignment:**
+
+pfSense will detect your 2 network adapters and show something like:
 
 ```
-WAN interface: hn0 (MAC: XX:XX:XX:XX:XX:XX) [External switch]
-LAN interface: hn1 (MAC: YY:YY:YY:YY:YY:YY) [Internal switch]
+Valid interfaces are:
+hn0  XX:XX:XX:XX:XX:XX (up)
+hn1  YY:YY:YY:YY:YY:YY (up)
+
+Do you want to set up VLANs now? [y/n]:
 ```
 
-1. **Assign Interfaces:**
-   - VLANs: `n` (no)
-   - WAN: `hn0` (first MAC address)
-   - LAN: `hn1` (second MAC address)
-   - Optional: (leave empty, press Enter)
-   - Proceed: `y`
+1. **VLANs:**
+   - Type: `n` (no VLANs)
+   - Press **Enter**
 
-2. **Set LAN IP Address:**
-   - Option: `2` (Set interface IP address)
-   - Interface: `2` (LAN)
-   - IP Address: `10.0.1.1`
-   - Subnet: `24`
-   - Upstream gateway: (leave empty, press Enter)
-   - IPv6: `n`
-   - DHCP Server: `y`
-   - Start address: `10.0.1.100`
-   - End address: `10.0.1.200`
-   - HTTP WebGUI: `n` (we'll use HTTPS)
+2. **WAN Interface:**
+   ```
+   Enter the WAN interface name: 
+   ```
+   - Type: `hn0` (first adapter = External switch)
+   - Press **Enter**
 
-3. **Note the WebGUI URL:**
+3. **LAN Interface:**
    ```
-   https://10.0.1.1
-   Username: admin
-   Password: pfsense
+   Enter the LAN interface name:
    ```
+   - Type: `hn1` (second adapter = Internal-Lab switch)
+   - Press **Enter**
+
+4. **Optional Interface:**
+   ```
+   Enter the Optional 1 interface name:
+   ```
+   - Just press **Enter** (leave empty)
+
+5. **Confirmation:**
+   ```
+   WAN  -> hn0
+   LAN  -> hn1
+   
+   Do you want to proceed? [y/n]:
+   ```
+   - Type: `y`
+   - Press **Enter**
+
+**Console Menu:**
+
+You'll now see the pfSense main menu:
+
+```
+*** Welcome to pfSense ***
+WAN (wan)   -> hn0 -> [IP from DHCP, e.g., 192.168.1.x]
+LAN (lan)   -> hn1 -> 192.168.1.1
+
+0) Logout
+1) Assign Interfaces
+2) Set interface(s) IP address
+3) Reset webConfigurator password
+...
+Enter an option:
+```
+
+**Configure LAN IP Address:**
+
+1. Type: `2` (Set interface(s) IP address)
+2. Press **Enter**
+
+3. **Select Interface:**
+   ```
+   Available interfaces:
+   1 - WAN
+   2 - LAN
+   
+   Enter the number of the interface:
+   ```
+   - Type: `2` (LAN)
+   - Press **Enter**
+
+4. **Configure LAN IPv4 Address:**
+   ```
+   Enter the new LAN IPv4 address: 
+   ```
+   - Type: `10.0.1.1`
+   - Press **Enter**
+
+5. **Subnet Mask:**
+   ```
+   Enter the new LAN IPv4 subnet bit count:
+   ```
+   - Type: `24`
+   - Press **Enter**
+
+6. **Upstream Gateway:**
+   ```
+   For a LAN, press <ENTER> for none:
+   ```
+   - Just press **Enter** (no gateway for LAN)
+
+7. **IPv6 Configuration:**
+   ```
+   Do you want to enable the DHCP server on LAN? [y/n]:
+   ```
+   - Type: `n` (skip IPv6)
+   - Press **Enter**
+
+8. **DHCP Server:**
+   ```
+   Do you want to enable the DHCP server on LAN? [y/n]:
+   ```
+   - Type: `y` (enable DHCP)
+   - Press **Enter**
+
+9. **DHCP Start Address:**
+   ```
+   Enter the start address of the range:
+   ```
+   - Type: `10.0.1.100`
+   - Press **Enter**
+
+10. **DHCP End Address:**
+    ```
+    Enter the end address of the range:
+    ```
+    - Type: `10.0.1.200`
+    - Press **Enter**
+
+11. **HTTP Revert:**
+    ```
+    Do you want to revert to HTTP as the webConfigurator protocol? [y/n]:
+    ```
+    - Type: `n` (keep HTTPS)
+    - Press **Enter**
+
+**Success!**
+
+You should see:
+
+```
+The IPv4 LAN address has been set to 10.0.1.1/24
+You can now access the webConfigurator by opening https://10.0.1.1/
+```
+
+**Write down these credentials:**
+- **URL:** https://10.0.1.1
+- **Username:** admin
+- **Password:** pfsense
+
+Press **Enter** to return to main menu.
 
 ---
 
 ## 📝 Step 4: Create Windows Server 2022 VM
 
-### Create VM
+You can use **PowerShell** (faster) or **Hyper-V Manager GUI** (more visual). Choose one method.
+
+### Method 1: PowerShell (Recommended - Faster)
 
 ```powershell
-# Create VM with 4 GB RAM
-New-VM -Name "ArcServer-Lab" -MemoryStartupBytes 4GB -Generation 2 -Path "C:\Hyper-V"
+# Open PowerShell as Administrator
+
+# Create VM folder
+New-Item -Path "C:\Hyper-V\ArcServer-Lab" -ItemType Directory -Force
+
+# Create virtual hard disk (40 GB)
+New-VHD -Path "C:\Hyper-V\ArcServer-Lab\ArcServer-Lab.vhdx" -SizeBytes 40GB -Dynamic
+
+# Create VM (Generation 2 for Windows Server 2022)
+New-VM -Name "ArcServer-Lab" `
+       -MemoryStartupBytes 4GB `
+       -Generation 2 `
+       -BootDevice VHD `
+       -VHDPath "C:\Hyper-V\ArcServer-Lab\ArcServer-Lab.vhdx" `
+       -Path "C:\Hyper-V"
 
 # Configure processor (2 vCPUs)
 Set-VMProcessor -VMName "ArcServer-Lab" -Count 2
 
-# Add network adapter (connected to pfSense LAN)
-Add-VMNetworkAdapter -VMName "ArcServer-Lab" -SwitchName "Internal-Lab"
+# Connect network adapter to Internal-Lab (pfSense LAN)
+Get-VMNetworkAdapter -VMName "ArcServer-Lab" | Connect-VMNetworkAdapter -SwitchName "Internal-Lab"
 
-# Create virtual hard disk (40 GB)
-New-VHD -Path "C:\Hyper-V\ArcServer-Lab\ArcServer-Lab.vhdx" -SizeBytes 40GB -Dynamic
-Add-VMHardDiskDrive -VMName "ArcServer-Lab" -Path "C:\Hyper-V\ArcServer-Lab\ArcServer-Lab.vhdx"
-
-# Mount Windows Server ISO
+# Add DVD drive and mount Windows Server ISO
 Add-VMDvdDrive -VMName "ArcServer-Lab" -Path "C:\ISOs\WS2022-Eval.iso"
 
-# Set boot order (DVD first)
+# Set boot order (DVD first for installation)
 $dvd = Get-VMDvdDrive -VMName "ArcServer-Lab"
 Set-VMFirmware -VMName "ArcServer-Lab" -FirstBootDevice $dvd
+
+# Disable Secure Boot (optional, but sometimes helps with installation)
+Set-VMFirmware -VMName "ArcServer-Lab" -EnableSecureBoot Off
+
+# Disable checkpoints (saves disk space)
+Set-VM -Name "ArcServer-Lab" -CheckpointType Disabled
 
 # Start VM
 Start-VM -Name "ArcServer-Lab"
@@ -377,50 +697,235 @@ Start-VM -Name "ArcServer-Lab"
 vmconnect localhost "ArcServer-Lab"
 ```
 
-### Install Windows Server 2022
+**⚠️ Important:** Windows Server installation will begin automatically in the console window.
 
-1. **Language/Time:** Select and click "Next"
-2. **Install:** Click "Install now"
-3. **Edition:** Select "Windows Server 2022 Standard (Desktop Experience)"
-4. **License:** Accept terms
-5. **Installation Type:** "Custom: Install Windows only"
-6. **Disk:** Select unallocated space, click "Next"
-7. **Wait:** Installation takes 10-15 minutes
-8. **Administrator Password:** Set a strong password (e.g., `P@ssw0rd123!`)
+### Method 2: Hyper-V Manager GUI (Step-by-Step)
+
+1. **Open Hyper-V Manager:**
+   - Press `Windows + R`
+   - Type: `virtmgmt.msc` and press Enter
+
+2. **New Virtual Machine Wizard:**
+   - Right-click your computer name → **New** → **Virtual Machine**
+   - Click "Next"
+
+3. **Specify Name and Location:**
+   - Name: `ArcServer-Lab`
+   - Location: `C:\Hyper-V` (or leave default)
+   - Click "Next"
+
+4. **Specify Generation:**
+   - Select: **Generation 2** (modern Windows Server)
+   - Click "Next"
+
+5. **Assign Memory:**
+   - Startup memory: `4096` MB (4 GB)
+   - Check "Use Dynamic Memory" (optional, saves RAM)
+   - Click "Next"
+
+6. **Configure Networking:**
+   - Connection: Select **Internal-Lab** (pfSense LAN)
+   - Click "Next"
+
+7. **Connect Virtual Hard Disk:**
+   - Select: "Create a virtual hard disk"
+   - Name: `ArcServer-Lab.vhdx`
+   - Location: `C:\Hyper-V\ArcServer-Lab\`
+   - Size: `40` GB
+   - Click "Next"
+
+8. **Installation Options:**
+   - Select: "Install an operating system from a bootable image file"
+   - Click "Browse" → Navigate to `C:\ISOs\WS2022-Eval.iso`
+   - Click "Next"
+
+9. **Completing Wizard:**
+   - Review settings
+   - Click "Finish"
+
+10. **Configure VM Settings (Before First Boot):**
+    - Right-click "ArcServer-Lab" → **Settings**
+    
+    **Processor:**
+    - Click "Processor" (left menu)
+    - Number of virtual processors: `2`
+    
+    **Security (Optional):**
+    - Click "Security" (left menu)
+    - Uncheck "Enable Secure Boot" (helps avoid boot issues)
+    
+    **Checkpoints (Optional):**
+    - Click "Checkpoints" (left menu)
+    - Uncheck "Enable checkpoints" (saves disk space)
+    
+    - Click "OK"
+
+11. **Start VM:**
+    - Right-click "ArcServer-Lab" → **Connect**
+    - In console window, click **Start**
+    - Windows Server installation will begin automatically
+
+### Install Windows Server 2022 (In VM Console)
+
+The VM console will show Windows Setup. Follow these steps:
+
+1. **Windows Setup - Language:**
+   - Language to install: `English (United States)`
+   - Time and currency format: `English (United States)`
+   - Keyboard or input method: `US`
+   - Click **Next**
+
+2. **Install Now:**
+   - Click **Install now** (center of screen)
+   - Wait 10-20 seconds for setup to load
+
+3. **Activate Windows:**
+   ```
+   Enter the product key to activate Windows
+   ```
+   - Click **I don't have a product key** (bottom)
+   - We'll use evaluation version (180 days free)
+
+4. **Select Operating System:**
+   ```
+   Select the operating system you want to install:
+   
+   [ ] Windows Server 2022 Standard
+   [ ] Windows Server 2022 Standard (Desktop Experience)
+   [ ] Windows Server 2022 Datacenter
+   [ ] Windows Server 2022 Datacenter (Desktop Experience)
+   ```
+   - Select: **Windows Server 2022 Standard (Desktop Experience)**
+   - **Important:** Choose "Desktop Experience" to get GUI!
+   - Click **Next**
+
+5. **License Terms:**
+   - Check: **I accept the Microsoft Software License Terms**
+   - Click **Next**
+
+6. **Installation Type:**
+   ```
+   Which type of installation do you want?
+   
+   Upgrade: Install Windows and keep files, settings, and applications
+   Custom: Install Windows only (advanced)
+   ```
+   - Select: **Custom: Install Windows only (advanced)**
+   - Click
+
+7. **Where do you want to install Windows?**
+   ```
+   Drive 0 Unallocated Space    40.0 GB
+   ```
+   - Select the unallocated space (should be only option)
+   - Click **Next**
+
+8. **Installing Windows:**
+   - Installation will begin (takes 10-15 minutes)
+   - Progress stages:
+     * Copying Windows files (0-10%)
+     * Getting files ready for installation (10-30%)
+     * Installing features (30-60%)
+     * Installing updates (60-90%)
+     * Finishing up (90-100%)
+   - **VM will reboot automatically** during installation (normal)
+
+9. **Customize Settings (After Reboot):**
+   ```
+   Customize settings
+   
+   Administrator
+   
+   Enter a password for the built-in administrator account.
+   ```
+   - **Password:** Type a strong password (e.g., `P@ssw0rd123!`)
+   - **Reenter password:** Type same password
+   - Click **Finish**
+
+10. **First Login:**
+    - Press **Ctrl+Alt+End** (in Hyper-V, this sends Ctrl+Alt+Del)
+    - Or: Click Action → Ctrl+Alt+Delete (menu bar)
+    - Enter your administrator password
+    - Press **Enter**
+
+**Windows Server will load (30-60 seconds). Server Manager opens automatically.**
 
 ### Initial Server Configuration
 
-After installation, server will reboot into Windows:
+**Configure Static IP Address:**
 
-1. **Server Manager** will open automatically
-2. **Configure Network:**
-   - Click "Local Server"
-   - Click "Ethernet" (should show "DHCP enabled")
-   - Right-click network connection → Properties
-   - Select "Internet Protocol Version 4 (TCP/IPv4)"
-   - Click "Properties"
-   - Configure:
+1. **Open Network Settings:**
+   - In **Server Manager**, click **Local Server** (left panel)
+   - Find **Ethernet** (should show "IPv4 address assigned by DHCP")
+   - Click on **Ethernet** (the blue text)
+
+2. **Network Connections Window Opens:**
+   - Right-click **Ethernet** → **Properties**
+
+3. **Configure IPv4:**
+   - Scroll down and select **Internet Protocol Version 4 (TCP/IPv4)**
+   - Click **Properties**
+
+4. **Set Static IP:**
+   - Select: **Use the following IP address:**
+   - Fill in:
      ```
-     IP address:     10.0.1.10
-     Subnet mask:    255.255.255.0
-     Default gateway: 10.0.1.1 (pfSense)
-     Preferred DNS:  10.0.1.1 (pfSense, temporary)
+     IP address:         10.0.1.10
+     Subnet mask:        255.255.255.0
+     Default gateway:    10.0.1.1
      ```
-   - Click "OK"
+   - Select: **Use the following DNS server addresses:**
+     ```
+     Preferred DNS server:  10.0.1.1
+     Alternate DNS server:  (leave empty)
+     ```
+   - Click **OK**
+   - Click **Close**
 
-3. **Set Computer Name:**
-   - In Server Manager, click "Computer name: WIN-XXXXXX"
-   - Click "Change"
-   - Computer name: `ArcServer01`
-   - Click "OK" → Restart
-
-4. **Verify Connectivity to pfSense:**
+5. **Verify Network:**
+   - Open **PowerShell** (search in Start menu)
+   - Run:
    ```powershell
-   # Open PowerShell
+   # Check IP configuration
+   Get-NetIPAddress -InterfaceAlias Ethernet -AddressFamily IPv4
+   
+   # Test pfSense connectivity
    Test-NetConnection 10.0.1.1
    ```
+   - Should show: **PingSucceeded : True**
 
-   Should show: **PingSucceeded : True**
+**Change Computer Name:**
+
+1. **In Server Manager:**
+   - Click **Local Server** (if not already there)
+   - Find **Computer name:** (shows something like "WIN-ABCD1234")
+   - Click on the computer name (blue text)
+
+2. **System Properties Window:**
+   - Click **Change...** button
+
+3. **Computer Name/Domain Changes:**
+   - Computer name: Type `ArcServer01`
+   - Leave "Member of: Workgroup" selected
+   - Click **OK**
+
+4. **Restart Required:**
+   ```
+   You must restart your computer to apply these changes.
+   ```
+   - Click **OK**
+   - Click **Close**
+   - Click **Restart Now**
+
+5. **After Restart:**
+   - Login again (Ctrl+Alt+End, then password)
+   - Verify computer name in PowerShell:
+   ```powershell
+   $env:COMPUTERNAME
+   # Should show: ArcServer01
+   ```
+
+**✓ Windows Server VM is now ready!**
 
 ---
 
@@ -774,7 +1279,76 @@ if ($testsPassed -eq 6) {
 
 ---
 
-## 🚨 VPN Troubleshooting (If Tests Failed)
+## � Setup Summary - What You've Built
+
+By completing this guide, you've created a complete on-premises simulation:
+
+### ✅ Infrastructure Components
+
+**Hyper-V Environment:**
+- ✓ 2 Virtual Switches (External + Internal-Lab)
+- ✓ 2 Virtual Machines (pfSense + Windows Server)
+- ✓ Isolated network topology simulating real datacenter
+
+**pfSense Firewall:**
+- ✓ Configured with WAN (internet) + LAN (10.0.1.0/24)
+- ✓ DHCP server for LAN network
+- ✓ Firewall rules blocking all direct internet access
+- ✓ IPsec S2S VPN tunnel to Azure (IKEv2)
+- ✓ Phase 1 + Phase 2 VPN configuration
+
+**Windows Server 2022 (ArcServer01):**
+- ✓ Static IP: 10.0.1.10/24
+- ✓ Gateway: pfSense (10.0.1.1)
+- ✓ DNS: Azure Firewall via VPN (10.100.0.4)
+- ✓ NO direct internet access (security validated)
+- ✓ Can reach Azure resources via VPN only
+
+**Azure Side (Created by Deploy-Lab4 Script):**
+- ✓ VPN Gateway with public IP
+- ✓ Local Network Gateway (your public IP)
+- ✓ S2S VPN connection (Connected status)
+- ✓ Azure Firewall with Explicit Proxy enabled
+- ✓ 18 application rules for Arc endpoints
+
+### 🔒 Security Validation
+
+Your setup now enforces:
+- ✗ Direct internet access **BLOCKED**
+- ✓ VPN tunnel to Azure **WORKING**
+- ✓ Proxy access (8081/8443) **WORKING**
+- ✓ All traffic must go through Azure Firewall
+
+### 📈 Network Flow
+
+```
+ArcServer01 (10.0.1.10)
+    ↓
+pfSense LAN (10.0.1.1)
+    ↓
+VPN Tunnel (encrypted IPsec)
+    ↓
+Azure VPN Gateway (Public IP)
+    ↓
+Azure Firewall (10.100.0.4)
+    ↓
+Azure Arc Endpoints (via proxy 8081/8443)
+```
+
+### ⏱️ Time Spent
+
+| Component | Setup Time |
+|-----------|------------|
+| Hyper-V + Switches | 10-15 min |
+| pfSense VM Install | 20-30 min |
+| Windows Server Install | 20-30 min |
+| pfSense Configuration | 15-20 min |
+| VPN Setup | 15-20 min |
+| **Total** | **80-115 min** |
+
+---
+
+## �🚨 VPN Troubleshooting (If Tests Failed)
 
 ### Troubleshooting if VPN Doesn't Connect
 
