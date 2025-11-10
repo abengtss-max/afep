@@ -2,6 +2,8 @@
 
 > **📋 Having issues?** Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for diagnostic commands and solutions
 
+> **🚀 LAB 4 - Azure Arc + Explicit Proxy:** [START HERE - LAB4-START-HERE.md](LAB4-START-HERE.md) - Complete guide for Azure Arc with Explicit Proxy over S2S VPN
+
 ## Introduction in Simple Terms
 
 Azure Firewall Explicit Proxy (AFEP) acts like a checkpoint for internet traffic in Azure. Instead of letting servers and apps go straight to the internet, AFEP makes them send traffic through Azure Firewall first, giving you control and visibility.
@@ -1064,13 +1066,48 @@ Remove-AzResourceGroup -Name "RG-AFEP-HubSpoke" -Force -AsJob
 
 ---
 
+### ✅ Lab 4: Azure Arc + Explicit Proxy (S2S VPN)
+
+**🚀 COMPLETE GUIDE:** [LAB4-START-HERE.md](LAB4-START-HERE.md)
+
+**Goal**: Deploy Azure Arc-enabled servers using Explicit Proxy over Site-to-Site VPN with NO direct internet access.
+
+**Estimated Time**: 2-3 hours (first time)
+
+**What You'll Build:**
+- ✅ Azure VPN Gateway + Azure Firewall Premium with Explicit Proxy
+- ✅ On-premises simulation using Hyper-V (pfSense + Windows Server)
+- ✅ S2S VPN tunnel (encrypted IPsec)
+- ✅ Azure Arc agent configured with proxy
+- ✅ Zero direct internet access (all traffic via VPN + proxy)
+- ✅ 18 application rules for Arc endpoints
+
+**Key Features:**
+- Proves Azure Arc works with Explicit Proxy (validate customer claims)
+- Hybrid connectivity (on-prem to Azure via VPN)
+- Strict security (no direct internet allowed)
+- Real-world enterprise scenario
+
+**📖 Start Here:** [LAB4-START-HERE.md](LAB4-START-HERE.md) - Complete step-by-step guide with:
+- Phase 1: Azure Infrastructure Deployment (30-40 min)
+- Phase 2: On-Premises Hyper-V Setup (60-90 min)
+- Phase 3: Azure Arc Agent Installation (15-20 min)
+- Phase 4: Comprehensive Validation (15-20 min)
+
+**Prerequisites:**
+- Windows 11 Pro (Hyper-V support required)
+- 16 GB RAM, 100 GB disk space
+- Azure subscription
+
+---
+
 ## Summary
 
 This automated guide helps you:
 
 ✅ **Focus on learning AFEP** - Infrastructure is automated  
 ✅ **Hands-on AFEP configuration** - You manually configure the important parts  
-✅ **Real-world scenarios** - Hub-spoke, PAC files, application rules  
+✅ **Real-world scenarios** - Hub-spoke, PAC files, application rules, **Azure Arc integration**  
 ✅ **Save time** - 10-15 minute infrastructure deployments instead of 45-60 minutes  
 
 ### What You'll Master
