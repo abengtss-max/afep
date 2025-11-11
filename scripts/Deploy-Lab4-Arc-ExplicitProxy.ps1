@@ -425,25 +425,67 @@ $arcOptionalRuleCollection = New-AzFirewallPolicyFilterRuleCollection `
     -Rule $arcOptionalRules `
     -ActionType Allow
 
-# Create Rule Collection Group
-$ruleCollectionGroup = Get-AzFirewallPolicyRuleCollectionGroup `
-    -Name "ArcRuleCollectionGroup" `
-    -AzureFirewallPolicy $fwPolicy `
-    -ErrorAction SilentlyContinue
+# Create or get Rule Collection Group
+try {
+    $ruleCollectionGroup = Get-AzFirewallPolicyRuleCollectionGroup `
+        -Name "DefaultApplicationRuleCollectionGroup" `
+        -ResourceGroupName $config.ResourceGroupName `
+        -AzureFirewallPolicyName $config.FirewallPolicyName `
+        -ErrorAction SilentlyContinue
 
-if (-not $ruleCollectionGroup) {
-    $ruleCollectionGroup = New-AzFirewallPolicyRuleCollectionGroup `
-        -Name "ArcRuleCollectionGroup" `
-        -Priority 100 `
-        -FirewallPolicyObject $fwPolicy `
-        -RuleCollection $arcCoreRuleCollection, $arcInstallRuleCollection, $arcOptionalRuleCollection
-    
-    Write-Success "Created 3 Application Rule Collections:"
-    Write-Success "  - Arc-Core-Always-Required (10 rules)"
-    Write-Success "  - Arc-Installation-Downloads (2 rules)"
-    Write-Success "  - Arc-Optional-Features (6 rules)"
-} else {
-    Write-Info "Rule collections already exist"
+    if (-not $ruleCollectionGroup) {
+        Write-Info "Creating rule collection group with Arc rules..."
+        
+        # Create new rule collection group with all three collections
+        $ruleCollectionGroup = New-AzFirewallPolicyRuleCollectionGroup `
+            -Name "DefaultApplicationRuleCollectionGroup" `
+            -Priority 200 `
+            -ResourceGroupName $config.ResourceGroupName `
+            -AzureFirewallPolicyName $config.FirewallPolicyName `
+            -RuleCollection $arcCoreRuleCollection, $arcInstallRuleCollection, $arcOptionalRuleCollection
+        
+        Write-Success "Created 3 Application Rule Collections:"
+        Write-Success "  - Arc-Core-Always-Required (10 rules)"
+        Write-Success "  - Arc-Installation-Downloads (2 rules)"
+        Write-Success "  - Arc-Optional-Features (6 rules)"
+    } else {
+        Write-Info "Rule collection group already exists, adding Arc rules..."
+        
+        # Get existing collections
+        $existingCollections = $ruleCollectionGroup.Properties.RuleCollection
+        
+        # Add new collections if they don't exist
+        $collectionNames = $existingCollections | ForEach-Object { $_.Name }
+        
+        if ("Arc-Core-Always-Required" -notin $collectionNames) {
+            $existingCollections += $arcCoreRuleCollection
+        }
+        if ("Arc-Installation-Downloads" -notin $collectionNames) {
+            $existingCollections += $arcInstallRuleCollection
+        }
+        if ("Arc-Optional-Features" -notin $collectionNames) {
+            $existingCollections += $arcOptionalRuleCollection
+        }
+        
+        # Update the group
+        Set-AzFirewallPolicyRuleCollectionGroup `
+            -Name "DefaultApplicationRuleCollectionGroup" `
+            -ResourceGroupName $config.ResourceGroupName `
+            -AzureFirewallPolicyName $config.FirewallPolicyName `
+            -Priority 200 `
+            -RuleCollection $existingCollections | Out-Null
+        
+        Write-Success "Updated rule collections with Arc rules"
+    }
+} catch {
+    Write-Warning "Failed to create rule collections automatically: $($_.Exception.Message)"
+    Write-Info ""
+    Write-Info "⚠️  You'll need to create these rules manually in Azure Portal:"
+    Write-Info "   1. Navigate to Firewall Policy: $($config.FirewallPolicyName)"
+    Write-Info "   2. Go to 'Application Rules' under Settings"
+    Write-Info "   3. Create rule collections based on GUIDE-Arc-Agent-Proxy-Config.md"
+    Write-Info ""
+    Write-Info "   Continuing with deployment..."
 }
 
 # ==============================================================================
