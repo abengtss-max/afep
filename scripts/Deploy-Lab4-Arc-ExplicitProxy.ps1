@@ -273,10 +273,9 @@ $fwPolicy = Get-AzFirewallPolicy -Name $config.FirewallPolicyName -ResourceGroup
 if (-not $fwPolicy) {
     # Create explicit proxy settings
     $explicitProxy = New-AzFirewallPolicyExplicitProxy `
-        -EnableExplicitProxy $true `
+        -EnableExplicitProxy `
         -HttpPort $config.ProxyHttpPort `
-        -HttpsPort $config.ProxyHttpsPort `
-        -EnablePacFile $false  # PAC file not needed for Arc agents
+        -HttpsPort $config.ProxyHttpsPort
     
     $fwPolicy = New-AzFirewallPolicy `
         -Name $config.FirewallPolicyName `
@@ -284,7 +283,6 @@ if (-not $fwPolicy) {
         -Location $Location `
         -SkuTier Premium `
         -ExplicitProxy $explicitProxy `
-        -DnsEnableProxy $true `
         -ThreatIntelMode Alert
     
     Write-Success "Created Firewall Policy with Explicit Proxy enabled"
