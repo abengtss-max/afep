@@ -114,16 +114,30 @@ if ($disk.FreeGB -lt 60) {
     Write-Host "  ⚠  Minimum 60 GB recommended" -ForegroundColor Yellow
 }
 
-# Check virtualization support
-$virt = (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
-Write-Host "Virtualization Enabled: $virt" -ForegroundColor $(if($virt){'Green'}else{'Red'})
-if (-not $virt) {
-    Write-Host "  ✗ CRITICAL: Enable virtualization in BIOS!" -ForegroundColor Red
-    Write-Host "    1. Restart PC" -ForegroundColor White
-    Write-Host "    2. Enter BIOS (usually F2, Del, F10, or Esc)" -ForegroundColor White
-    Write-Host "    3. Find 'Virtualization Technology' or 'Intel VT-x' / 'AMD-V'" -ForegroundColor White
-    Write-Host "    4. Enable it" -ForegroundColor White
-    Write-Host "    5. Save and exit" -ForegroundColor White
+# Check virtualization support (works on both x64 and ARM64)
+$processorArch = (Get-CimInstance Win32_Processor).Architecture
+$isARM64 = $processorArch -eq 12  # 12 = ARM64
+
+if ($isARM64) {
+    Write-Host "Processor Architecture: ARM64 (Snapdragon/Qualcomm)" -ForegroundColor Cyan
+    Write-Host "Virtualization Check: ✓ Verify manually in Task Manager" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  ℹ️  ARM64 Note: PowerShell check doesn't work on ARM processors" -ForegroundColor Yellow
+    Write-Host "     Open Task Manager (Ctrl+Shift+Esc) → Performance → CPU" -ForegroundColor White
+    Write-Host "     Look for 'Virtualization: Enabled' at the bottom" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  ✓ If Task Manager shows 'Enabled', you're good to proceed!" -ForegroundColor Green
+} else {
+    $virt = (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
+    Write-Host "Virtualization Enabled: $virt" -ForegroundColor $(if($virt){'Green'}else{'Red'})
+    if (-not $virt) {
+        Write-Host "  ✗ CRITICAL: Enable virtualization in BIOS!" -ForegroundColor Red
+        Write-Host "    1. Restart PC" -ForegroundColor White
+        Write-Host "    2. Enter BIOS (usually F2, Del, F10, or Esc)" -ForegroundColor White
+        Write-Host "    3. Find 'Virtualization Technology' or 'Intel VT-x' / 'AMD-V'" -ForegroundColor White
+        Write-Host "    4. Enable it" -ForegroundColor White
+        Write-Host "    5. Save and exit" -ForegroundColor White
+    }
 }
 ```
 
@@ -138,15 +152,45 @@ New-Item -ItemType Directory -Path "C:\ISOs" -Force
 
 **Download 1: pfSense**
 
+> **IMPORTANT**: pfSense downloads as `.iso.gz` (compressed), you must **extract** it first!
+
 1. Open browser and go to: https://www.pfsense.org/download/
 2. Configuration:
    - **Architecture:** AMD64 (64-bit)
    - **Installer:** DVD Image (ISO)
    - **Mirror:** Choose closest location
 3. Click "Download"
-4. Save to: `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso`
-5. Size: ~800 MB
-6. Wait for download to complete
+4. You'll get: `netgate-installer-amd64.iso.gz` (compressed file ~320 MB)
+   > **Note**: The downloaded file may have a generic name like `netgate-installer-amd64.iso.gz`
+5. **Extract the ISO**:
+   - **Option A (7-Zip - Recommended)**: 
+     - Download 7-Zip from https://www.7-zip.org/ if not installed
+     - Right-click the `.iso.gz` file → "7-Zip" → "Extract Here"
+     - Move extracted ISO to `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso`
+   
+   - **Option B (PowerShell)**:
+     ```powershell
+     # Find the downloaded .gz file (may have different name)
+     $gzFile = "$env:USERPROFILE\Downloads\netgate-installer-amd64.iso.gz"
+     $isoFile = "C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso"
+     
+     # Create ISOs directory
+     New-Item -ItemType Directory -Path "C:\ISOs" -Force | Out-Null
+     
+     # Extract (using proper variable names to avoid $input conflict)
+     $inputStream = [System.IO.File]::OpenRead($gzFile)
+     $gzipStream = New-Object System.IO.Compression.GzipStream($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
+     $outputStream = [System.IO.File]::Create($isoFile)
+     $gzipStream.CopyTo($outputStream)
+     $outputStream.Close()
+     $gzipStream.Close()
+     $inputStream.Close()
+     
+     $sizeMB = [math]::Round((Get-Item $isoFile).Length / 1MB, 2)
+     Write-Host "✓ Extracted to: $isoFile ($sizeMB MB)" -ForegroundColor Green
+     ```
+6. Final file: `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso` (~995 MB)
+7. Wait for extraction to complete
 
 **Download 2: Windows Server 2022**
 
@@ -155,16 +199,18 @@ New-Item -ItemType Directory -Path "C:\ISOs" -Force
 3. Select: **64-bit edition ISO**
 4. Language: **English (United States)**
 5. Click "Download"
-6. Save to: `C:\ISOs\WS2022-Eval.iso`
-7. Size: ~5 GB
-8. Wait for download (may take 10-30 minutes depending on connection)
+6. Downloaded filename: `SERVER_EVAL_x64FRE_en-us.iso`
+7. Move/copy to: `C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso`
+   > **Note**: You can keep the original filename or rename to `WS2022-Eval.iso`
+8. Size: ~5 GB
+9. Wait for download (may take 10-30 minutes depending on connection)
 
 **Verify downloads:**
 
 ```powershell
-# Check ISO files exist
+# Check ISO files exist (using actual filenames)
 $pfSenseIso = "C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso"
-$ws2022Iso = "C:\ISOs\WS2022-Eval.iso"
+$ws2022Iso = "C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso"
 
 if (Test-Path $pfSenseIso) {
     $size = [math]::Round((Get-Item $pfSenseIso).Length / 1MB, 2)
@@ -251,6 +297,14 @@ Hyper-V Manager window should open. You'll use this GUI frequently.
 ---
 
 ## 📝 Step 2: Create Hyper-V Virtual Switches
+
+> **⚠️ CRITICAL**: All commands in this section **MUST** be run in **PowerShell as Administrator**!
+> 
+> **How to open Admin PowerShell:**
+> 1. Press `Windows key`
+> 2. Type: `PowerShell`
+> 3. Right-click "Windows PowerShell" → **Run as administrator**
+> 4. Click "Yes" on UAC prompt
 
 ### Create External Switch (for internet/VPN)
 
@@ -678,7 +732,7 @@ Set-VMProcessor -VMName "ArcServer-Lab" -Count 2
 Get-VMNetworkAdapter -VMName "ArcServer-Lab" | Connect-VMNetworkAdapter -SwitchName "Internal-Lab"
 
 # Add DVD drive and mount Windows Server ISO
-Add-VMDvdDrive -VMName "ArcServer-Lab" -Path "C:\ISOs\WS2022-Eval.iso"
+Add-VMDvdDrive -VMName "ArcServer-Lab" -Path "C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso"
 
 # Set boot order (DVD first for installation)
 $dvd = Get-VMDvdDrive -VMName "ArcServer-Lab"
@@ -736,7 +790,7 @@ vmconnect localhost "ArcServer-Lab"
 
 8. **Installation Options:**
    - Select: "Install an operating system from a bootable image file"
-   - Click "Browse" → Navigate to `C:\ISOs\WS2022-Eval.iso`
+   - Click "Browse" → Navigate to `C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso`
    - Click "Next"
 
 9. **Completing Wizard:**

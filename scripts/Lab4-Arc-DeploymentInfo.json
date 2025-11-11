@@ -1,0 +1,45 @@
+{
+  "Location": "swedencentral",
+  "NextSteps": [
+    "1. Follow GUIDE-OnPremises-HyperV-Setup.md to setup Hyper-V VMs",
+    "2. Configure pfSense with VPN Gateway Public IP: 20.240.93.34",
+    "3. Update Local Network Gateway with your pfSense public IP",
+    "4. Test VPN connectivity: Test-NetConnection 10.100.0.4 -Port 8081",
+    "5. Follow GUIDE-Arc-Agent-Proxy-Config.md to install Arc agent",
+    "6. Run validation tests from VALIDATION-Arc-Connectivity.md"
+  ],
+  "VNet": {
+    "Name": "vnet-arc-hub",
+    "FirewallSubnet": "10.100.0.0/26",
+    "AddressSpace": "10.100.0.0/16",
+    "GatewaySubnet": "10.100.255.0/24"
+  },
+  "ArcConfiguration": {
+    "ProxyBypass": "localhost,127.0.0.1",
+    "AgentConfigCommand": "azcmagent config set proxy.url \"http://10.100.0.4:8081\"",
+    "ProxyUrl": "http://10.100.0.4:8081",
+    "AgentConnectCommand": "azcmagent connect \\\r\n  --resource-group \"rg-afep-lab04-arc-alibengtsson\" \\\r\n  --tenant-id \"<your-tenant-id>\" \\\r\n  --location \"swedencentral\" \\\r\n  --subscription-id \"<your-subscription-id>\" \\\r\n  --proxy-url \"http://10.100.0.4:8081\""
+  },
+  "AzureFirewall": {
+    "Name": "azfw-arc-lab",
+    "SKU": "Premium",
+    "PrivateIP": "10.100.0.4",
+    "ExplicitProxy": {
+      "PacPort": 8090,
+      "Enabled": true,
+      "HttpPort": 8081,
+      "HttpsPort": 8443
+    },
+    "PublicIP": "135.225.27.204"
+  },
+  "VPNGateway": {
+    "GatewayType": "VPN-RouteBased",
+    "Name": "vpngw-arc-lab",
+    "SharedKey": "0a84d999-675a-4029-bb2e-fc302b7bd9a5",
+    "SKU": "VpnGw1",
+    "PublicIP": "20.240.93.34",
+    "Instructions": "Use this Public IP and Shared Key to configure S2S VPN on your pfSense firewall"
+  },
+  "ResourceGroup": "rg-afep-lab04-arc-alibengtsson",
+  "DeployedAt": "2025-11-11 07:41:40"
+}
