@@ -312,8 +312,20 @@ Hyper-V Manager window should open. You'll use this GUI frequently.
 # List your physical network adapters
 Get-NetAdapter | Select-Object Name, Status, LinkSpeed
 
-# Create external switch (replace "Ethernet" with your adapter name)
-New-VMSwitch -Name "External" -NetAdapterName "Ethernet" -AllowManagementOS $true
+# Auto-detect the active network adapter (WiFi or Ethernet)
+$activeAdapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up" -and $_.Name -notlike "vEthernet*" -and $_.Name -notlike "Bluetooth*"} | Select-Object -First 1
+
+if ($activeAdapter) {
+    Write-Host "Detected active adapter: $($activeAdapter.Name)" -ForegroundColor Green
+    Write-Host "Creating External switch..." -ForegroundColor Yellow
+    
+    New-VMSwitch -Name "External" -NetAdapterName $activeAdapter.Name -AllowManagementOS $true
+    
+    Write-Host "✓ External switch created successfully!" -ForegroundColor Green
+} else {
+    Write-Host "✗ No active physical network adapter found!" -ForegroundColor Red
+    Write-Host "Please connect to WiFi or Ethernet first." -ForegroundColor Yellow
+}
 ```
 
 **⚠️ Warning:** Your internet may disconnect briefly (5-10 seconds) during this step.
