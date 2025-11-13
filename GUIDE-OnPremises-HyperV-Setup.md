@@ -8,10 +8,14 @@ This guide walks you through setting up the **on-premises environment** on your 
 - ✅ Windows Server 2022 (Arc-enabled server)
 - ✅ Site-to-Site VPN to Azure
 
-**Operating System:** Windows 11 Pro/Enterprise (ARM64 or x64)  
+**Operating System:** Windows 11 Pro/Enterprise (x64 or ARM64)  
 **Time required:** 2-3 hours (first time)
 
-**✨ ARM64 Compatible:** This guide uses OPNsense (supports Generation 2 VMs) and works on ARM64 devices (Snapdragon X Elite/Plus)
+**✅ Platform Compatibility:**
+- **Intel/AMD x64:** Full support - Uses Generation 1 VMs (best compatibility)
+- **ARM64 (Snapdragon):** Limited support - Generation 2 only, UEFI boot issues with Linux/BSD ISOs
+
+**⚠️ RECOMMENDED:** Use **Intel/AMD x64 hardware** for this lab. ARM64 has significant VM boot compatibility issues.
 
 **⚠️ CRITICAL:** This guide assumes you have **NOT** completed any previous steps. We'll validate everything as we go.
 
@@ -241,20 +245,25 @@ if ($disk.FreeGB -lt 60) {
     Write-Host "  ⚠  Minimum 60 GB recommended" -ForegroundColor Yellow
 }
 
-# Check virtualization support (works on both x64 and ARM64)
+# Check virtualization support and processor architecture
 $processorArch = (Get-CimInstance Win32_Processor).Architecture
 $isARM64 = $processorArch -eq 12  # 12 = ARM64
 
 if ($isARM64) {
-    Write-Host "Processor Architecture: ARM64 (Snapdragon/Qualcomm)" -ForegroundColor Cyan
-    Write-Host "Virtualization Check: ✓ Verify manually in Task Manager" -ForegroundColor Yellow
+    Write-Host "Processor Architecture: ARM64 (Snapdragon/Qualcomm)" -ForegroundColor Yellow
+    Write-Host "⚠️  WARNING: ARM64 has limited VM compatibility" -ForegroundColor Yellow
+    Write-Host "   - Generation 1 VMs NOT supported" -ForegroundColor White
+    Write-Host "   - Generation 2 VMs have UEFI boot issues with Linux/BSD" -ForegroundColor White
+    Write-Host "   - OPNsense/pfSense may not boot" -ForegroundColor White
     Write-Host ""
-    Write-Host "  ℹ️  ARM64 Note: PowerShell check doesn't work on ARM processors" -ForegroundColor Yellow
-    Write-Host "     Open Task Manager (Ctrl+Shift+Esc) → Performance → CPU" -ForegroundColor White
+    Write-Host "  ℹ️  Virtualization Check: Open Task Manager" -ForegroundColor Cyan
+    Write-Host "     (Ctrl+Shift+Esc) → Performance → CPU" -ForegroundColor White
     Write-Host "     Look for 'Virtualization: Enabled' at the bottom" -ForegroundColor White
     Write-Host ""
-    Write-Host "  ✓ If Task Manager shows 'Enabled', you're good to proceed!" -ForegroundColor Green
+    Write-Host "  💡 RECOMMENDATION: Use Intel/AMD x64 hardware instead" -ForegroundColor Yellow
 } else {
+    Write-Host "Processor Architecture: x64 (Intel/AMD)" -ForegroundColor Green
+    Write-Host "✅ Full VM compatibility (Generation 1 and 2 supported)" -ForegroundColor Green
     $virt = (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
     Write-Host "Virtualization Enabled: $virt" -ForegroundColor $(if($virt){'Green'}else{'Red'})
     if (-not $virt) {
@@ -572,10 +581,13 @@ if ($externalSwitches) {
 
 OPNsense provides **enterprise-grade firewall functionality** with:
 - ✅ **URL/FQDN filtering** (essential for Azure Arc endpoints)
-- ✅ **ARM64 compatibility** (Generation 2 VM support)
 - ✅ **VPN capabilities** (IPsec Site-to-Site)
 - ✅ **Professional Web GUI** (like commercial firewalls)
 - ✅ **Advanced logging and monitoring**
+
+**Platform Notes:**
+- **Intel/AMD x64:** Use Generation 1 VMs (best compatibility, boots reliably)
+- **ARM64 (Snapdragon):** Generation 2 only, may have UEFI boot issues
 
 ### Step 3.1: Create VM with PowerShell (If Not Already Created)
 
@@ -590,16 +602,29 @@ if (-not (Test-Path $opnsenseImg)) {
     exit 1
 }
 
+# Detect processor architecture to determine VM generation
+$processorArch = (Get-CimInstance Win32_Processor).Architecture
+$isARM64 = $processorArch -eq 12
+$vmGeneration = if ($isARM64) { 2 } else { 1 }  # Gen 1 for x64, Gen 2 for ARM64
+
+Write-Host "Detected Architecture: $(if($isARM64){'ARM64'}else{'x64 (Intel/AMD)'})" -ForegroundColor Cyan
+Write-Host "Using VM Generation: $vmGeneration" -ForegroundColor Yellow
+if ($vmGeneration -eq 1) {
+    Write-Host "  ✅ Generation 1 = Best compatibility for Linux/BSD" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠️  Generation 2 = Required for ARM64 but may have boot issues" -ForegroundColor Yellow
+}
+
 # Create VM folder
 New-Item -Path "C:\Hyper-V\OPNsense-Lab" -ItemType Directory -Force
 
 # Create virtual hard disk (larger for OPNsense features)
 New-VHD -Path "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" -SizeBytes 16GB -Dynamic
 
-# Create VM (Generation 2 for ARM64 compatibility)
+# Create VM with appropriate generation for platform
 New-VM -Name "OPNsense-Lab" `
        -MemoryStartupBytes 2GB `
-       -Generation 2 `
+       -Generation $vmGeneration `
        -VHDPath "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" `
        -Path "C:\Hyper-V"
 
@@ -627,15 +652,23 @@ Write-Host "✓ Network adapters configured:" -ForegroundColor Green
 Write-Host "  - Adapter 1 (WAN): $($natSwitch.Name) - Internet via NAT (no impact on host WiFi)" -ForegroundColor White
 Write-Host "  - Adapter 2 (LAN): Internal-Lab - VM network (10.0.1.0/24)" -ForegroundColor White
 
-# Disable Secure Boot and configure for FreeBSD boot
-Set-VMFirmware -VMName "OPNsense-Lab" -EnableSecureBoot Off -SecureBootTemplate "MicrosoftUEFICertificateAuthority"
+# Configure boot settings based on VM generation
+if ($vmGeneration -eq 2) {
+    # Generation 2: Configure UEFI firmware and disable Secure Boot for FreeBSD
+    Set-VMFirmware -VMName "OPNsense-Lab" -EnableSecureBoot Off
+    
+    # Set boot order for Gen 2
+    $dvd = Get-VMDvdDrive -VMName "OPNsense-Lab"
+    $hd = Get-VMHardDiskDrive -VMName "OPNsense-Lab"
+    Set-VMFirmware -VMName "OPNsense-Lab" -BootOrder $dvd,$hd
+    
+    Write-Host "✓ Generation 2: UEFI boot configured (Secure Boot disabled)" -ForegroundColor Green
+} else {
+    # Generation 1: Uses legacy BIOS (no firmware configuration needed)
+    Write-Host "✓ Generation 1: Legacy BIOS boot (best compatibility)" -ForegroundColor Green
+}
 
 # Note: Nested virtualization disabled - not needed for OPNsense and may cause boot issues on some platforms
-
-# Set boot order (will boot from image copied to VHD)
-$dvd = Get-VMDvdDrive -VMName "OPNsense-Lab"
-$hd = Get-VMHardDiskDrive -VMName "OPNsense-Lab"
-Set-VMFirmware -VMName "OPNsense-Lab" -BootOrder $dvd,$hd
 
 # Disable checkpoints (saves disk space)
 Set-VM -Name "OPNsense-Lab" -CheckpointType Disabled
