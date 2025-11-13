@@ -11,7 +11,7 @@ The current Az.Network PowerShell module (v7.23.0) doesn't support configuring E
    - Navigate to: https://portal.azure.com
 
 2. **Go to your Azure Firewall**
-   - Resource Group: `rg-afep-lab04-arc-alibengtsson`
+   - Resource Group: `rg-afep-lab04-arc-<username>` (from your deployment)
    - Firewall: `azfw-arc-lab`
 
 3. **Enable Explicit Proxy**
@@ -37,7 +37,7 @@ az upgrade
 # Then try:
 az network firewall update \
   --name azfw-arc-lab \
-  --resource-group rg-afep-lab04-arc-alibengtsson \
+  --resource-group <your-resource-group-name> \
   --set additionalProperties.Network.DNS.EnableProxy=true
 ```
 
@@ -47,8 +47,10 @@ az network firewall update \
 # Get access token
 $token = (Get-AzAccessToken).Token
 
-# Firewall resource ID
-$fwId = "/subscriptions/b67d7073-183c-499f-aaa9-bbb4986dedf1/resourceGroups/rg-afep-lab04-arc-alibengtsson/providers/Microsoft.Network/azureFirewalls/azfw-arc-lab"
+# Firewall resource ID (replace with your values)
+$subscriptionId = (Get-AzContext).Subscription.Id
+$resourceGroup = "<your-resource-group-name>"
+$fwId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Network/azureFirewalls/azfw-arc-lab"
 
 # Get current firewall configuration
 $headers = @{
@@ -76,7 +78,7 @@ Invoke-RestMethod -Uri "https://management.azure.com$($fwId)?api-version=2023-09
 
 After enabling, verify with:
 ```powershell
-.\scripts\Check-Lab4-Status.ps1 -ResourceGroupName "rg-afep-lab04-arc-alibengtsson"
+.\scripts\Check-Lab4-Status.ps1 -ResourceGroupName "<your-resource-group-name>"
 ```
 
 The output should show:

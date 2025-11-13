@@ -16,7 +16,7 @@
 
 ```powershell
 # Navigate to your project folder
-cd C:\Users\alibengtsson\MyProjects\azfw
+cd <path-to-azfw-folder>
 
 # Run the connectivity fix script
 .\Fix-HyperV-Connectivity.ps1

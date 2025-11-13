@@ -105,7 +105,7 @@ $response.properties.explicitProxy
 
 ## Environment
 
-- **Resource Group:** `rg-afep-lab04-arc-alibengtsson`
+- **Resource Group:** `rg-afep-lab04-arc-<username>` (example)
 - **Firewall:** `azfw-arc-lab`
 - **Firewall Policy:** `azfwpolicy-arc-lab`
 - **Az.Network Version:** 7.23.0
