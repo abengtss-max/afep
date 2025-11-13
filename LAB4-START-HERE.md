@@ -12,13 +12,14 @@ A complete Azure Arc deployment using Explicit Proxy over Site-to-Site VPN with 
 │  │ Hyper-V VMs                                             │   │
 │  │                                                         │   │
 │  │  ┌──────────────┐         ┌──────────────────────┐    │   │
-│  │  │  pfSense     │────────▶│  Windows Server 2022 │    │   │
-│  │  │  Firewall    │         │  (ArcServer01)       │    │   │
-│  │  │              │         │                      │    │   │
-│  │  │  WAN: DHCP   │         │  IP: 10.0.1.10       │    │   │
-│  │  │  LAN: 10.0.1.1│        │  GW: 10.0.1.1        │    │   │
-│  │  │              │         │  DNS: 10.100.0.4     │    │   │
-│  │  │  ❌ Internet │         │  (via VPN)           │    │   │
+│  │  │ Windows      │────────▶│  Windows Server 2022 │    │   │
+│  │  │ Server Router│         │  (ArcServer01)       │    │   │
+│  │  │ (RRAS+NAT)   │         │                      │    │   │
+│  │  │              │         │  IP: 10.0.1.10       │    │   │
+│  │  │  WAN: DHCP   │         │  GW: 10.0.1.1        │    │   │
+│  │  │  LAN: 10.0.1.1│        │  DNS: 10.100.0.4     │    │   │
+│  │  │              │         │  (via VPN)           │    │   │
+│  │  │  ❌ Internet │         │                      │    │   │
 │  │  │  ✅ VPN Only │         │                      │    │   │
 │  │  └──────┬───────┘         └──────────────────────┘    │   │
 │  │         │                                             │   │
@@ -52,6 +53,51 @@ A complete Azure Arc deployment using Explicit Proxy over Site-to-Site VPN with 
 │                         monitoring, etc.)                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🖥️ Why Windows Server Router Instead of pfSense?
+
+**ARM64 Compatibility**: pfSense (FreeBSD-based) requires Generation 1 VMs which are **NOT supported** on ARM64 processors (Snapdragon X Elite/Plus). Windows Server Router uses Generation 2 VMs and works on both ARM64 and x64.
+
+### Windows Server Router Configuration
+
+The Windows Server Router VM acts as your on-premises firewall/gateway with:
+
+#### **RRAS (Routing and Remote Access Service) Features:**
+- **NAT (Network Address Translation)**: Provides internet access for internal VMs
+- **VPN Server**: Establishes IPsec Site-to-Site tunnel to Azure
+- **Routing**: Routes traffic between internal network and Azure VNet
+- **Demand Dial Interface**: Manages the Azure VPN connection
+
+#### **Windows Firewall Configuration:**
+```powershell
+# Block all outbound internet traffic (default deny)
+New-NetFirewallRule -DisplayName "Block-Internet-Outbound" `
+    -Direction Outbound -Action Block -Protocol Any `
+    -RemoteAddress "Internet"
+
+# Allow VPN traffic to Azure Gateway
+New-NetFirewallRule -DisplayName "Allow-Azure-VPN" `
+    -Direction Outbound -Action Allow -Protocol Any `
+    -RemoteAddress "20.240.93.34"  # Your Azure VPN Gateway IP
+
+# Allow local network communication
+New-NetFirewallRule -DisplayName "Allow-Local-Network" `
+    -Direction Outbound -Action Allow -Protocol Any `
+    -RemoteAddress "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+```
+
+#### **Network Interfaces:**
+- **WAN Interface**: Connected to "External" switch → Your PC's internet
+- **LAN Interface**: Connected to "Internal-Lab" switch → 10.0.1.1/24
+- **VPN Interface**: Demand Dial Interface → Azure VNet (10.100.0.0/16)
+
+#### **Security Benefits:**
+- ✅ **Zero Direct Internet**: ArcServer01 cannot access internet directly
+- ✅ **VPN-Only Access**: All Azure communication goes through encrypted tunnel  
+- ✅ **Firewall Controlled**: Windows Firewall enforces security policies
+- ✅ **Enterprise-Grade**: Same technology used in production environments
 
 ---
 
@@ -163,7 +209,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 - ✓ Verify Windows 11 Pro edition
 - ✓ Verify Azure deployment completed
 - ✓ Check hardware requirements (CPU, RAM, disk)
-- ✓ Download ISOs (pfSense + Windows Server 2022)
+- ✓ Download Windows Server 2022 ISO (2 copies needed: Router + Arc Server)
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Prerequisites](./GUIDE-OnPremises-HyperV-Setup.md#%EF%B8%8F-prerequisites)
 
@@ -180,35 +226,36 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 2](./GUIDE-OnPremises-HyperV-Setup.md#-step-2-create-hyper-v-virtual-switches)
 
-#### Step 2.3: Create pfSense VM (20-30 minutes)
-- ✓ Create VM (PowerShell or GUI method)
-- ✓ Install pfSense from ISO
-- ✓ Configure WAN/LAN interfaces
+#### Step 2.3: Create Windows Server Router VM (30-40 minutes)
+- ✓ Create VM (Generation 2 for ARM64 compatibility)
+- ✓ Install Windows Server 2022 with Desktop Experience
+- ✓ Configure dual NICs (WAN: External, LAN: Internal-Lab)
+- ✓ Install RRAS role (NAT + Routing + VPN)
 - ✓ Set LAN IP to 10.0.1.1/24
-- ✓ Enable DHCP server
+- ✓ Configure Windows Firewall (block internet, allow VPN)
 
-**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 3](./GUIDE-OnPremises-HyperV-Setup.md#-step-3-create-pfsense-firewall-vm)
+**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 3](./GUIDE-OnPremises-HyperV-Setup.md#-step-3-create-windows-server-router-vm)
 
 #### Step 2.4: Create Windows Server VM (20-30 minutes)
 - ✓ Create VM (PowerShell or GUI method)
 - ✓ Install Windows Server 2022 (Desktop Experience)
 - ✓ Configure static IP: 10.0.1.10/24
-- ✓ Set gateway to pfSense: 10.0.1.1
+- ✓ Set gateway to Router: 10.0.1.1
 - ✓ Rename computer to ArcServer01
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 4](./GUIDE-OnPremises-HyperV-Setup.md#-step-4-create-windows-server-2022-vm)
 
-#### Step 2.5: Configure pfSense Firewall Rules (15 minutes)
-- ✓ Access pfSense WebGUI (https://10.0.1.1)
-- ✓ Complete setup wizard
-- ✓ Block all internet traffic (except VPN)
+#### Step 2.5: Configure Windows Server Router Security (15 minutes)
+- ✓ Configure Windows Firewall with Advanced Security
+- ✓ Create rules to block all outbound internet traffic
+- ✓ Allow only VPN traffic and local network communication
 - ✓ Verify internet is blocked from ArcServer01
 
-**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 5](./GUIDE-OnPremises-HyperV-Setup.md#-step-5-configure-pfsense-firewall-rules)
+**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 5](./GUIDE-OnPremises-HyperV-Setup.md#-step-5-configure-windows-server-router-security)
 
 #### Step 2.6: Configure Site-to-Site VPN (15 minutes)
 - ✓ Get Azure VPN info from `Lab4-Arc-DeploymentInfo.json`
-- ✓ Configure IPsec VPN on pfSense (Phase 1 + Phase 2)
+- ✓ Configure IPsec VPN on Windows Server Router using RRAS
 - ✓ Update Azure Local Network Gateway with your public IP
 - ✓ Create VPN connection in Azure
 
@@ -216,7 +263,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 #### Step 2.7: Verify VPN Connectivity (5 minutes)
 - ✓ Run 6-point VPN validation script
-- ✓ Test pfSense gateway
+- ✓ Test Windows Server Router gateway
 - ✓ Test Azure Firewall via VPN
 - ✓ Test proxy ports (8081, 8443)
 - ✓ Verify internet is blocked
@@ -253,7 +300,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 #### Step 3.0: Prerequisites Validation (5 minutes)
 - ✓ Verify hostname is ArcServer01
 - ✓ Verify deployment info file exists
-- ✓ Test pfSense connectivity
+- ✓ Test Windows Server Router connectivityr connectivity
 - ✓ Test Azure Firewall via VPN
 - ✓ Test proxy ports (8081, 8443)
 - ✓ Verify internet is BLOCKED
@@ -335,7 +382,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 ### ✅ On-Premises Environment
 - Hyper-V virtualization on Windows 11 Pro
-- pfSense firewall with VPN tunnel
+- Windows Server 2022 Router with RRAS and VPN tunnel
 - Windows Server 2022 (ArcServer01)
 - NO direct internet access (security enforced)
 
@@ -369,14 +416,15 @@ Use this lab to demonstrate:
 ### Common Issues:
 
 **VPN Won't Connect:**
-- Check pfSense status: Status → IPsec → Overview
+- Check Windows Server Router RRAS status: Server Manager → RRAS Console
 - Verify Azure connection: Portal → VPN Gateway → Connections
 - Confirm public IP updated in Local Network Gateway
+- Check Windows Firewall rules on Router
 
 **Can't Reach Azure Firewall:**
-- Verify VPN shows "ESTABLISHED" on pfSense
+- Verify VPN shows "Connected" in RRAS Console
 - Test: `Test-NetConnection 10.100.0.4`
-- Check pfSense firewall rules allow 10.100.0.0/16
+- Check Windows Server Router firewall rules allow 10.100.0.0/16
 
 **Arc Agent Connection Fails:**
 - Verify proxy environment variables set
