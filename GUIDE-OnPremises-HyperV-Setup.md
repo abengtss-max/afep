@@ -268,7 +268,7 @@ if ($isARM64) {
 New-Item -ItemType Directory -Path "C:\ISOs" -Force
 ```
 
-**Download Windows Server 2022 (You'll need 2 copies for Router + Arc Server)**
+**Download Windows Server 2022 (for Arc Server)**
 
 1. Go to: https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022
 2. Fill in registration form (required by Microsoft)
@@ -753,16 +753,16 @@ Complete the setup wizard in the web interface:
 The OPNsense firewall is now ready for Azure Arc-specific configuration.
 
 12. **Start VM:**
-    - Right-click "pfSense-Lab" → **Connect**
+    - Right-click "OPNsense-Lab" → **Connect**
     - In console window, click **Start**
 
-### Install pfSense (In VM Console)
+### Install OPNsense (In VM Console)
 
-The VM console should now show pfSense boot menu. Follow these steps:
+The VM console should now show OPNsense boot menu. Follow these steps:
 
 1. **Boot Menu:**
    - Wait for boot menu (or press Enter)
-   - pfSense will start loading (takes 30-60 seconds)
+   - OPNsense will start loading (takes 30-60 seconds)
 
 2. **Copyright Notice:**
    - You'll see a copyright and distribution notice
@@ -770,13 +770,13 @@ The VM console should now show pfSense boot menu. Follow these steps:
 
 3. **Welcome Screen:**
    ```
-   Welcome to pfSense!
+   Welcome to OPNsense!
    
-   Install pfSense
+   Install OPNsense
    Rescue Shell
    Recover config.xml
    ```
-   - Use arrow keys to select **Install pfSense**
+   - Use arrow keys to select **Install OPNsense**
    - Press **Enter**
 
 4. **Keymap Selection:**
@@ -852,18 +852,18 @@ The VM console should now show pfSense boot menu. Follow these steps:
     - Press **Enter**
 
 12. **Eject ISO (Important!):**
-    - **In Hyper-V Manager:** Right-click "pfSense-Lab" → Settings
+    - **In Hyper-V Manager:** Right-click "OPNsense-Lab" → Settings
     - Select "DVD Drive" → Select "None"
     - Click "OK"
     - This ensures VM boots from hard disk, not ISO
 
 ### Initial Configuration (After Reboot)
 
-After reboot (takes 30-60 seconds), you'll see the pfSense console menu.
+After reboot (takes 30-60 seconds), you'll see the OPNsense console menu.
 
 **Interface Assignment:**
 
-pfSense will detect your 2 network adapters and show something like:
+OPNsense will detect your 2 network adapters and show something like:
 
 ```
 Valid interfaces are:
@@ -909,10 +909,10 @@ Do you want to set up VLANs now? [y/n]:
 
 **Console Menu:**
 
-You'll now see the pfSense main menu:
+You'll now see the OPNsense main menu:
 
 ```
-*** Welcome to pfSense ***
+*** Welcome to OPNsense ***
 WAN (wan)   -> hn0 -> [IP from DHCP, e.g., 192.168.1.x]
 LAN (lan)   -> hn1 -> 192.168.1.1
 
@@ -1006,8 +1006,8 @@ You can now access the webConfigurator by opening https://10.0.1.1/
 
 **Write down these credentials:**
 - **URL:** https://10.0.1.1
-- **Username:** admin
-- **Password:** pfsense
+- **Username:** root
+- **Password:** (your password)
 
 Press **Enter** to return to main menu.
 
@@ -1039,7 +1039,7 @@ New-VM -Name "ArcServer-Lab" `
 # Configure processor (2 vCPUs)
 Set-VMProcessor -VMName "ArcServer-Lab" -Count 2
 
-# Connect network adapter to Internal-Lab (pfSense LAN)
+# Connect network adapter to Internal-Lab (OPNsense LAN)
 Get-VMNetworkAdapter -VMName "ArcServer-Lab" | Connect-VMNetworkAdapter -SwitchName "Internal-Lab"
 
 # Add DVD drive and mount Windows Server ISO
@@ -1089,7 +1089,7 @@ vmconnect localhost "ArcServer-Lab"
    - Click "Next"
 
 6. **Configure Networking:**
-   - Connection: Select **Internal-Lab** (pfSense LAN)
+   - Connection: Select **Internal-Lab** (OPNsense LAN)
    - Click "Next"
 
 7. **Connect Virtual Hard Disk:**
@@ -1254,7 +1254,7 @@ The VM console will show Windows Setup. Follow these steps:
    # Check IP configuration
    Get-NetIPAddress -InterfaceAlias Ethernet -AddressFamily IPv4
    
-   # Test pfSense connectivity
+   # Test OPNsense connectivity
    Test-NetConnection 10.0.1.1
    ```
    - Should show: **PingSucceeded : True**
@@ -1553,7 +1553,7 @@ Test-NetConnection 10.100.0.4 -Port 443
 This configuration **mimics real enterprise firewall policies** where internet access is restricted and only business-critical services are permitted.
    - **Source:** LAN net
    - **Destination:** This firewall (self)
-   - **Description:** "Allow access to pfSense WebGUI and DNS"
+   - **Description:** "Allow access to OPNsense WebGUI and DNS"
    - Click "Save"
 
 4. **Add Rule: Allow VPN Traffic (placeholder)**
@@ -1575,7 +1575,7 @@ This configuration **mimics real enterprise firewall policies** where internet a
    # Should FAIL or timeout - this is expected!
    
    Test-NetConnection 10.0.1.1
-   # Should SUCCEED - pfSense is reachable
+   # Should SUCCEED - OPNsense is reachable
    ```
 
 ---
@@ -1598,7 +1598,7 @@ Write-Host "Azure Firewall Private IP: $($azureInfo.AzureFirewall.PrivateIP)" -F
 
 **Write these down! You'll need them next.**
 
-### Configure IPsec VPN on pfSense
+### Configure IPsec VPN on OPNsense
 
 1. **Navigate:** VPN → IPsec → Tunnels
 
@@ -1723,8 +1723,8 @@ Write-Host "╚═════════════════════�
 $testsPassed = 0
 $testsFailed = 0
 
-# Test 1: pfSense local gateway
-Write-Host "[1/6] Testing pfSense local gateway (10.0.1.1)..." -NoNewline
+# Test 1: OPNsense local gateway
+Write-Host "[1/6] Testing OPNsense local gateway (10.0.1.1)..." -NoNewline
 $result = Test-NetConnection -ComputerName 10.0.1.1 -WarningAction SilentlyContinue
 if ($result.PingSucceeded) {
     Write-Host " ✓" -ForegroundColor Green
@@ -1809,9 +1809,9 @@ if ($testsPassed -eq 6) {
     
     if ($testsFailed -gt 0) {
         Write-Host "Troubleshooting steps:" -ForegroundColor Cyan
-        Write-Host "  1. Check pfSense VPN status: Status → IPsec → Overview" -ForegroundColor White
+        Write-Host "  1. Check OPNsense VPN status: Status → IPsec → Overview" -ForegroundColor White
         Write-Host "  2. Verify Azure VPN connection: Azure Portal → VPN Gateway → Connections" -ForegroundColor White
-        Write-Host "  3. Check firewall rules on pfSense: Firewall → Rules → LAN" -ForegroundColor White
+        Write-Host "  3. Check firewall rules on OPNsense: Firewall → Rules → LAN" -ForegroundColor White
         Write-Host "  4. Review troubleshooting section below`n" -ForegroundColor White
     }
 }
@@ -1819,7 +1819,7 @@ if ($testsPassed -eq 6) {
 
 ### Additional Manual Verification
 
-**From pfSense WebGUI:**
+**From OPNsense WebGUI:**
 
 1. **Check VPN Status:**
    - Navigate: **Status → IPsec → Overview**
@@ -1827,7 +1827,7 @@ if ($testsPassed -eq 6) {
    - Status should show: **ESTABLISHED** (green)
    - If shows "CONNECTING" or red, VPN is NOT working
 
-2. **Test Ping from pfSense:**
+2. **Test Ping from OPNsense:**
    - Navigate: **Diagnostics → Ping**
    - **Hostname:** `10.100.0.4`
    - **Click:** "Ping"
@@ -1858,10 +1858,10 @@ By completing this guide, you've created a complete on-premises simulation:
 
 **Hyper-V Environment:**
 - ✓ 2 Virtual Switches (External + Internal-Lab)
-- ✓ 2 Virtual Machines (pfSense + Windows Server)
+- ✓ 2 Virtual Machines (OPNsense + Windows Server)
 - ✓ Isolated network topology simulating real datacenter
 
-**pfSense Firewall:**
+**OPNsense Firewall:**
 - ✓ Configured with WAN (internet) + LAN (10.0.1.0/24)
 - ✓ DHCP server for LAN network
 - ✓ Firewall rules blocking all direct internet access
@@ -1870,7 +1870,7 @@ By completing this guide, you've created a complete on-premises simulation:
 
 **Windows Server 2022 (ArcServer01):**
 - ✓ Static IP: 10.0.1.10/24
-- ✓ Gateway: pfSense (10.0.1.1)
+- ✓ Gateway: OPNsense (10.0.1.1)
 - ✓ DNS: Azure Firewall via VPN (10.100.0.4)
 - ✓ NO direct internet access (security validated)
 - ✓ Can reach Azure resources via VPN only
@@ -1895,7 +1895,7 @@ Your setup now enforces:
 ```
 ArcServer01 (10.0.1.10)
     ↓
-pfSense LAN (10.0.1.1)
+OPNsense LAN (10.0.1.1)
     ↓
 VPN Tunnel (encrypted IPsec)
     ↓
@@ -1911,9 +1911,9 @@ Azure Arc Endpoints (via proxy 8081/8443)
 | Component | Setup Time |
 |-----------|------------|
 | Hyper-V + Switches | 10-15 min |
-| pfSense VM Install | 20-30 min |
+| OPNsense VM Install | 20-30 min |
 | Windows Server Install | 20-30 min |
-| pfSense Configuration | 15-20 min |
+| OPNsense Configuration | 15-20 min |
 | VPN Setup | 15-20 min |
 | **Total** | **80-115 min** |
 
@@ -1923,7 +1923,7 @@ Azure Arc Endpoints (via proxy 8081/8443)
 
 ### Troubleshooting if VPN Doesn't Connect
 
-1. **Check pfSense IPsec logs:**
+1. **Check OPNsense IPsec logs:**
    - Status → System Logs → IPsec
    - Look for errors
 
@@ -2008,8 +2008,8 @@ if (Test-Path $deployFile) {
     $checks.Failed++
 }
 
-# Check 3: pfSense gateway
-Write-Host "[3/10] Testing pfSense gateway (10.0.1.1)..." -NoNewline
+# Check 3: OPNsense gateway
+Write-Host "[3/10] Testing OPNsense gateway (10.0.1.1)..." -NoNewline
 $result = Test-NetConnection -ComputerName 10.0.1.1 -WarningAction SilentlyContinue
 if ($result.PingSucceeded) {
     Write-Host " ✓" -ForegroundColor Green
@@ -2125,10 +2125,10 @@ if ($checks.Passed -eq 10) {
     Write-Host "`nCommon fixes:" -ForegroundColor Cyan
     Write-Host "  • Wrong hostname → Rename computer to ArcServer01 and reboot" -ForegroundColor White
     Write-Host "  • Missing deployment file → Copy from host PC to C:\" -ForegroundColor White
-    Write-Host "  • pfSense unreachable → Check Hyper-V network, pfSense VM running" -ForegroundColor White
+    Write-Host "  • OPNsense unreachable → Check Hyper-V network, OPNsense VM running" -ForegroundColor White
     Write-Host "  • Azure Firewall unreachable → Check VPN status (Step 7 troubleshooting)" -ForegroundColor White
     Write-Host "  • Proxy ports fail → Verify Azure Firewall Explicit Proxy enabled" -ForegroundColor White
-    Write-Host "  • Internet NOT blocked → Check pfSense firewall rules (Step 5)" -ForegroundColor White
+    Write-Host "  • Internet NOT blocked → Check OPNsense firewall rules (Step 5)" -ForegroundColor White
     Write-Host "  • DNS fails → Check DNS server setting (Step 8)" -ForegroundColor White
     Write-Host "`n" -ForegroundColor White
     exit 1
@@ -2139,7 +2139,7 @@ if ($checks.Passed -eq 10) {
 
 ✓ **Hostname:** Confirms you're on ArcServer01 (not host PC)
 ✓ **Deployment File:** Azure deployment info is available
-✓ **pfSense Gateway:** Local gateway is reachable
+✓ **OPNsense Gateway:** Local gateway is reachable
 ✓ **VPN Tunnel:** Can reach Azure Firewall through VPN
 ✓ **Proxy Ports:** HTTP (8081) and HTTPS (8443) are accessible
 ✓ **Security:** Internet is properly blocked (no direct access)
@@ -2192,7 +2192,7 @@ Once you see **"ALL CHECKS PASSED"** in green:
 **Cause:** VPN not fully established or routing issue  
 **Solution:**
 ```powershell
-# On pfSense, check routing table
+# On OPNsense, check routing table
 Diagnostics → Routes → Display
 
 # Should see route to 10.100.0.0/16 via VPN

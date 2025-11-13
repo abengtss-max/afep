@@ -55,13 +55,13 @@ if (Test-Path $deploymentFile) {
     exit 1
 }
 
-# Check 3: Verify pfSense reachable (local gateway)
-Write-Host "`n[3/8] Testing pfSense connectivity..." -ForegroundColor Yellow
+# Check 3: Verify OPNsense reachable (local gateway)
+Write-Host "`n[3/8] Testing OPNsense connectivity..." -ForegroundColor Yellow
 $result = Test-NetConnection -ComputerName 10.0.1.1 -WarningAction SilentlyContinue
 if ($result.PingSucceeded) {
-    Write-Host "✓ pfSense reachable (10.0.1.1)" -ForegroundColor Green
+    Write-Host "✓ OPNsense reachable (10.0.1.1)" -ForegroundColor Green
 } else {
-    Write-Host "✗ Cannot reach pfSense" -ForegroundColor Red
+    Write-Host "✗ Cannot reach OPNsense" -ForegroundColor Red
     Write-Host "  Check: Network adapter settings" -ForegroundColor Yellow
     Write-Host "  Expected: IP 10.0.1.10/24, Gateway 10.0.1.1" -ForegroundColor Yellow
     exit 1
@@ -75,8 +75,8 @@ if ($result.PingSucceeded) {
     Write-Host "✓ Azure Firewall reachable via VPN ($firewallIP)" -ForegroundColor Green
 } else {
     Write-Host "✗ Cannot reach Azure Firewall" -ForegroundColor Red
-    Write-Host "  Check: S2S VPN status on Windows Server Router" -ForegroundColor Yellow
-    Write-Host "  Go to: Server Manager → RRAS → Remote Access Management Console" -ForegroundColor Yellow
+    Write-Host "  Check: S2S VPN status on OPNsense" -ForegroundColor Yellow
+    Write-Host "  Go to: OPNsense WebGUI → VPN → IPsec → Status Overview" -ForegroundColor Yellow
     Write-Host "  Status should be: ESTABLISHED (green)" -ForegroundColor Yellow
     exit 1
 }
@@ -110,7 +110,7 @@ try {
     $result = Test-NetConnection -ComputerName google.com -Port 443 -WarningAction SilentlyContinue -InformationLevel Quiet -ErrorAction Stop
     if ($result) {
         Write-Host "✗ SECURITY ISSUE: Internet is NOT blocked!" -ForegroundColor Red
-        Write-Host "  Check: Windows Server Router firewall rules" -ForegroundColor Yellow
+        Write-Host "  Check: OPNsense firewall rules" -ForegroundColor Yellow
         Write-Host "  Required: Delete default 'allow all' rule" -ForegroundColor Yellow
         exit 1
     }

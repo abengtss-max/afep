@@ -1076,7 +1076,7 @@ Remove-AzResourceGroup -Name "RG-AFEP-HubSpoke" -Force -AsJob
 
 **What You'll Build:**
 - ✅ Azure VPN Gateway + Azure Firewall Premium with Explicit Proxy
-- ✅ On-premises simulation using Hyper-V (pfSense + Windows Server)
+- ✅ On-premises simulation using Hyper-V (OPNsense + Windows Server)
 - ✅ S2S VPN tunnel (encrypted IPsec)
 - ✅ Azure Arc agent configured with proxy
 - ✅ Zero direct internet access (all traffic via VPN + proxy)

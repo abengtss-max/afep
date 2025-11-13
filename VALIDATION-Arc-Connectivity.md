@@ -34,13 +34,13 @@ From **ArcServer01**, open PowerShell:
 ```powershell
 Write-Host "`n=== TEST 1: NETWORK CONNECTIVITY ===" -ForegroundColor Cyan
 
-# Test 1.1: Ping pfSense (local gateway)
-Write-Host "`n[1.1] Testing pfSense reachability..." -ForegroundColor Yellow
+# Test 1.1: Ping OPNsense (local gateway)
+Write-Host "`n[1.1] Testing OPNsense reachability..." -ForegroundColor Yellow
 $result = Test-NetConnection -ComputerName 10.0.1.1 -WarningAction SilentlyContinue
 if ($result.PingSucceeded) {
-    Write-Host "✓ pfSense reachable (10.0.1.1)" -ForegroundColor Green
+    Write-Host "✓ OPNsense reachable (10.0.1.1)" -ForegroundColor Green
 } else {
-    Write-Host "✗ pfSense NOT reachable" -ForegroundColor Red
+    Write-Host "✗ OPNsense NOT reachable" -ForegroundColor Red
 }
 
 # Test 1.2: Ping Azure Firewall via VPN
@@ -245,7 +245,7 @@ if ($allBlocked) {
     Write-Host "  All traffic must go through VPN + Azure Firewall" -ForegroundColor Green
 } else {
     Write-Host "`n✗ SECURITY WARNING: Direct internet access detected!" -ForegroundColor Red
-    Write-Host "  Check Windows Server Router firewall rules" -ForegroundColor Yellow
+    Write-Host "  Check OPNsense firewall rules" -ForegroundColor Yellow
 }
 
 # Test 5.2: Verify proxy still works
@@ -410,7 +410,7 @@ Server: $env:COMPUTERNAME
 --------------------------------------------------------------------
 NETWORK CONNECTIVITY
 --------------------------------------------------------------------
-Windows Server Router (10.0.1.1):    $((Test-NetConnection 10.0.1.1 -WarningAction SilentlyContinue).PingSucceeded)
+OPNsense Firewall (10.0.1.1):        $((Test-NetConnection 10.0.1.1 -WarningAction SilentlyContinue).PingSucceeded)
 Azure Firewall (10.100.0.4):         $((Test-NetConnection 10.100.0.4 -WarningAction SilentlyContinue).PingSucceeded)
 HTTP Proxy Port (8081):               $((Test-NetConnection 10.100.0.4 -Port 8081 -WarningAction SilentlyContinue).TcpTestSucceeded)
 HTTPS Proxy Port (8443):              $((Test-NetConnection 10.100.0.4 -Port 8443 -WarningAction SilentlyContinue).TcpTestSucceeded)
@@ -460,7 +460,7 @@ Get-Content $reportFile
 
 ### All Tests Should Show:
 
-1. **Network Connectivity:** ✓ All 4 tests pass (Windows Server Router, Azure Firewall, ports 8081/8443)
+1. **Network Connectivity:** ✓ All 4 tests pass (OPNsense Firewall, Azure Firewall, ports 8081/8443)
 2. **Proxy Configuration:** ✓ Environment variables set, Arc agent configured
 3. **Arc Agent Status:** ✓ Status = Connected, heartbeat recent
 4. **Endpoint Reachability:** ✓ All required endpoints show "Reachable"

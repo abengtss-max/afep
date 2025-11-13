@@ -12,15 +12,15 @@ A complete Azure Arc deployment using Explicit Proxy over Site-to-Site VPN with 
 │  │ Hyper-V VMs                                             │   │
 │  │                                                         │   │
 │  │  ┌──────────────┐         ┌──────────────────────┐    │   │
-│  │  │ Windows      │────────▶│  Windows Server 2022 │    │   │
-│  │  │ Server Router│         │  (ArcServer01)       │    │   │
-│  │  │ (RRAS+NAT)   │         │                      │    │   │
-│  │  │              │         │  IP: 10.0.1.10       │    │   │
-│  │  │  WAN: DHCP   │         │  GW: 10.0.1.1        │    │   │
-│  │  │  LAN: 10.0.1.1│        │  DNS: 10.100.0.4     │    │   │
-│  │  │              │         │  (via VPN)           │    │   │
-│  │  │  ❌ Internet │         │                      │    │   │
-│  │  │  ✅ VPN Only │         │                      │    │   │
+│  │  │ OPNsense     │────────▶│  Windows Server 2022 │    │   │
+│  │  │ Firewall     │         │  (ArcServer01)       │    │   │
+│  │  │              │         │                      │    │   │
+│  │  │ WAN: DHCP    │         │  IP: 10.0.1.10       │    │   │
+│  │  │ LAN: 10.0.1.1│         │  GW: 10.0.1.1        │    │   │
+│  │  │              │         │  DNS: 10.100.0.4     │    │   │
+│  │  │ 🛡️ URL Filter│         │  (via VPN)           │    │   │
+│  │  │ ❌ Internet  │         │                      │    │   │
+│  │  │ ✅ Arc URLs  │         │                      │    │   │
 │  │  └──────┬───────┘         └──────────────────────┘    │   │
 │  │         │                                             │   │
 │  │         │ IPsec S2S VPN Tunnel (Encrypted)          │   │
@@ -212,7 +212,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 - ✓ Verify Windows 11 Pro edition
 - ✓ Verify Azure deployment completed
 - ✓ Check hardware requirements (CPU, RAM, disk)
-- ✓ Download Windows Server 2022 ISO (2 copies needed: Router + Arc Server)
+- ✓ Download OPNsense 25.7 ISO and Windows Server 2022 ISO
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Prerequisites](./GUIDE-OnPremises-HyperV-Setup.md#%EF%B8%8F-prerequisites)
 
