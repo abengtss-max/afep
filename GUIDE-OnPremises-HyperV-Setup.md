@@ -566,6 +566,8 @@ if ($externalSwitches) {
 
 ## 📝 Step 3: Create OPNsense Firewall VM
 
+> **✅ If you already created the OPNsense-Lab VM manually**, skip to **Step 3.3: Install OPNsense from ISO** below.
+
 **🛡️ OPNsense Enterprise Firewall Setup**
 
 OPNsense provides **enterprise-grade firewall functionality** with:
@@ -575,7 +577,7 @@ OPNsense provides **enterprise-grade firewall functionality** with:
 - ✅ **Professional Web GUI** (like commercial firewalls)
 - ✅ **Advanced logging and monitoring**
 
-### Method 1: PowerShell (Recommended - ARM64 Compatible)
+### Step 3.1: Create VM with PowerShell (If Not Already Created)
 
 ```powershell
 # Open PowerShell as Administrator
@@ -643,7 +645,24 @@ Write-Host "✓ OPNsense VM created successfully!" -ForegroundColor Green
 Write-Host "`nNext: Install OPNsense from image..." -ForegroundColor Yellow
 ```
 
-### Install OPNsense from Image
+### Step 3.2: Verify VM is Ready
+
+```powershell
+# Verify OPNsense VM configuration
+Get-VM -Name "OPNsense-Lab" | Format-List Name, State, CPUUsage, MemoryAssigned, MemoryDemand
+
+# Check network adapters
+Get-VMNetworkAdapter -VMName "OPNsense-Lab" | Format-Table Name, SwitchName, MacAddress -AutoSize
+
+# Expected output:
+# - 2 network adapters
+# - Adapter 1: Default Switch (WAN)
+# - Adapter 2: Internal-Lab (LAN)
+```
+
+### Step 3.3: Install OPNsense from Image or ISO
+
+> **📍 YOU ARE HERE** if you manually created the VM following my instructions.
 
 **Option A: Copy Image to VHD (Faster)**
 
