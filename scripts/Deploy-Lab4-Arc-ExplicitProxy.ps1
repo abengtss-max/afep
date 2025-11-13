@@ -13,7 +13,7 @@
     - Optional private endpoints for Arc services
     
     After running this script, follow the on-premises setup guide to:
-    1. Configure Hyper-V VMs (pfSense firewall + Windows Server)
+    1. Configure Hyper-V VMs (OPNsense firewall + Windows Server)
     2. Establish S2S VPN connection
     3. Install and configure Azure Arc agent with proxy settings
 
@@ -498,7 +498,7 @@ $localGwName = "lng-onprem-lab"
 $localGw = Get-AzLocalNetworkGateway -Name $localGwName -ResourceGroupName $config.ResourceGroupName -ErrorAction SilentlyContinue
 
 if (-not $localGw) {
-    # This will be updated later with your actual pfSense public IP
+    # This will be updated later with your actual OPNsense public IP
     $localGw = New-AzLocalNetworkGateway `
         -Name $localGwName `
         -ResourceGroupName $config.ResourceGroupName `
@@ -543,7 +543,7 @@ $deploymentInfo = @{
         SharedKey = $plainTextPassword
         GatewayType = "VPN-RouteBased"
         SKU = "VpnGw1"
-        Instructions = "Use this Public IP and Shared Key to configure S2S VPN on your pfSense firewall"
+        Instructions = "Use this Public IP and Shared Key to configure S2S VPN on your OPNsense firewall"
     }
     
     AzureFirewall = @{
@@ -575,8 +575,8 @@ azcmagent connect \
     
     NextSteps = @(
         "1. Follow GUIDE-OnPremises-HyperV-Setup.md to setup Hyper-V VMs"
-        "2. Configure pfSense with VPN Gateway Public IP: $($vpnPip.IpAddress)"
-        "3. Update Local Network Gateway with your pfSense public IP"
+        "2. Configure OPNsense with VPN Gateway Public IP: $($vpnPip.IpAddress)"
+        "3. Update Local Network Gateway with your OPNsense public IP"
         "4. Test VPN connectivity: Test-NetConnection $firewallPrivateIp -Port $($config.ProxyHttpPort)"
         "5. Follow GUIDE-Arc-Agent-Proxy-Config.md to install Arc agent"
         "6. Run validation tests from VALIDATION-Arc-Connectivity.md"
@@ -607,7 +607,7 @@ Write-Host ""
 Write-Host "🌐 VPN GATEWAY (for S2S VPN from your PC)" -ForegroundColor Cyan
 Write-Host "  Public IP:       " -NoNewline; Write-Host $vpnPip.IpAddress -ForegroundColor Yellow
 Write-Host "  Shared Key:      " -NoNewline; Write-Host $plainTextPassword -ForegroundColor Yellow
-Write-Host "  ⚠️  Use these values to configure pfSense VPN tunnel" -ForegroundColor Magenta
+Write-Host "  ⚠️  Use these values to configure OPNsense VPN tunnel" -ForegroundColor Magenta
 Write-Host ""
 
 Write-Host "🔥 AZURE FIREWALL (Explicit Proxy)" -ForegroundColor Cyan
@@ -626,9 +626,9 @@ Write-Host "📚 NEXT STEPS" -ForegroundColor Cyan
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 Write-Host ""
 Write-Host "  1. Open:  " -NoNewline; Write-Host "GUIDE-OnPremises-HyperV-Setup.md" -ForegroundColor Yellow
-Write-Host "     → Setup Hyper-V, pfSense firewall, Windows Server VM"
+Write-Host "     → Setup Hyper-V, OPNsense firewall, Windows Server VM"
 Write-Host ""
-Write-Host "  2. Configure S2S VPN on pfSense using:" -ForegroundColor White
+Write-Host "  2. Configure S2S VPN on OPNsense using:" -ForegroundColor White
 Write-Host "     Remote Gateway: " -NoNewline; Write-Host $vpnPip.IpAddress -ForegroundColor Yellow
 Write-Host "     Shared Key:     " -NoNewline; Write-Host $plainTextPassword -ForegroundColor Yellow
 Write-Host ""

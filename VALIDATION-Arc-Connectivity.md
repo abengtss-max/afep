@@ -493,12 +493,14 @@ Your lab is **fully validated** if:
 **Cause:** VPN tunnel down  
 **Solution:**
 ```powershell
-# Check VPN status on Windows Server Router
-# Navigate to: Server Manager → RRAS → Network Interfaces
-# Status should be: Connected (for Demand Dial Interface)
+# Check VPN status on OPNsense
+# Navigate to: VPN → IPsec → Status Overview
+# Status should be: ESTABLISHED (Phase 1 and Phase 2)
 
-# If not, reconnect:
-# Right-click interface → Connect
+# If not, troubleshoot:
+# 1. Check Phase 1 proposals match Azure VPN Gateway
+# 2. Verify shared key matches Azure configuration
+# 3. Check firewall rules allow IPsec traffic
 ```
 
 ### Test 2 Failed: Proxy Configuration
@@ -551,11 +553,12 @@ Get-AzFirewallPolicyRuleCollectionGroup `
 **Symptoms:** Can reach google.com directly  
 **Solution:**
 ```powershell
-# Check Windows Server Router firewall rules
-# Navigate to: Windows Firewall with Advanced Security → Outbound Rules
+# Check OPNsense firewall rules
+# Navigate to: Firewall → Rules → LAN
 # Ensure:
-#  - "Block Internet Outbound" rule exists and is enabled
-#  - "Allow Azure VPN" and "Allow Local Network" rules exist
+#  - Azure Arc endpoint rules are enabled (pass action)
+#  - "Block Everything Else" rule exists at bottom (block action)
+#  - Check Firewall → Log Files for blocked attempts
 ```
 
 ### Test 7 Failed: Extension Won't Install

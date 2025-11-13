@@ -153,11 +153,12 @@ Write-Host "══════════════════════�
 - Return here after VPN shows "ESTABLISHED"
 
 **Check 7 Failed (Internet not blocked):**
-- RDP to Windows Server Router: 10.0.1.1
-- Open: Windows Firewall with Advanced Security
-- Go to: Outbound Rules
-- Ensure "Block Internet Outbound" rule exists and is enabled
-- Keep only: "Allow to Azure via VPN" and "Allow Local Network"
+- Access OPNsense Web Interface: http://10.0.1.1
+- Login as root with your password
+- Go to: Firewall → Rules → LAN
+- Verify "Block Everything Else" rule exists and is enabled
+- Check firewall logs: Firewall → Log Files → Live View
+- Ensure only Azure Arc endpoints are allowed
 
 **Check 8 Warning (DNS):**
 - This is OK, we'll configure it in Step 8
@@ -641,7 +642,7 @@ azcmagent config list | Select-String "proxy"
 # Test VPN connectivity
 Test-NetConnection 10.100.0.4 -Port 8081
 
-# If VPN is down, check Windows Server Router: RRAS Console → Network Interfaces
+# If VPN is down, check OPNsense: VPN → IPsec → Status Overview
 ```
 
 ### Issue 3: "Authentication failed"
