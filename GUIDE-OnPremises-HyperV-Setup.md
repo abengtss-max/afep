@@ -627,11 +627,10 @@ Write-Host "✓ Network adapters configured:" -ForegroundColor Green
 Write-Host "  - Adapter 1 (WAN): $($natSwitch.Name) - Internet via NAT (no impact on host WiFi)" -ForegroundColor White
 Write-Host "  - Adapter 2 (LAN): Internal-Lab - VM network (10.0.1.0/24)" -ForegroundColor White
 
-# Enable nested virtualization (for advanced features)
-Set-VMProcessor -VMName "OPNsense-Lab" -ExposeVirtualizationExtensions $true
-
 # Disable Secure Boot and configure for FreeBSD boot
 Set-VMFirmware -VMName "OPNsense-Lab" -EnableSecureBoot Off -SecureBootTemplate "MicrosoftUEFICertificateAuthority"
+
+# Note: Nested virtualization disabled - not needed for OPNsense and may cause boot issues on some platforms
 
 # Set boot order (will boot from image copied to VHD)
 $dvd = Get-VMDvdDrive -VMName "OPNsense-Lab"
@@ -700,6 +699,9 @@ if (-not (Test-Path "C:\ISOs\OPNsense-25.7-dvd-amd64.iso")) {
 # Mount ISO to VM
 Set-VMDvdDrive -VMName "OPNsense-Lab" -Path "C:\ISOs\OPNsense-25.7-dvd-amd64.iso"
 
+# Disable nested virtualization if your platform doesn't support it
+Set-VMProcessor -VMName "OPNsense-Lab" -ExposeVirtualizationExtensions $false
+
 # Start VM
 Start-VM -Name "OPNsense-Lab"
 
@@ -709,6 +711,292 @@ vmconnect localhost "OPNsense-Lab"
 Write-Host "`n✓ VM started with OPNsense ISO mounted" -ForegroundColor Green
 Write-Host "Follow the installation wizard in the VM console window" -ForegroundColor Yellow
 ```
+
+### Step 3.4: OPNsense Installation Wizard
+
+The VM console will show the OPNsense boot menu. Follow these steps carefully:
+
+**1. Boot Menu (30-60 seconds):**
+   - You'll see the OPNsense boot menu
+   - Wait for auto-boot or press **Enter**
+   - OPNsense will load into live mode
+
+**2. Login to Console:**
+   ```
+   login: installer
+   password: opnsense
+   ```
+   - Type `installer` and press Enter
+   - Type `opnsense` and press Enter
+
+**3. Start Installation:**
+   ```
+   installer@OPNsense:~ $ opnsense-install
+   ```
+   - Type `opnsense-install` and press Enter
+
+**4. Keymap Selection:**
+   ```
+   Select a Keymap
+   >>> Continue with default keymap
+       Test keymap
+       Select keymap from list
+   ```
+   - Press **Enter** to use default US keymap
+   - Or select your keyboard layout if different
+
+**5. Partitioning Method:**
+   ```
+   Partitioning
+   >>> Auto (ZFS)
+       Shell
+       Auto (UFS) BIOS
+       Auto (UFS) UEFI
+       Manual
+   ```
+   - Use arrow keys to select **Auto (ZFS)**
+   - Press **Enter**
+
+**6. ZFS Installation Type:**
+   ```
+   >>> Install - Proceed with installation
+       Shell - Open a shell for manual setup
+   ```
+   - Select **Install**
+   - Press **Enter**
+
+**7. ZFS Pool Type:**
+   ```
+   >>> stripe - No redundancy
+       mirror - N-Way mirroring
+       raid10 - Striped mirror
+   ```
+   - Select **stripe** (we only have 1 disk)
+   - Press **Spacebar** to select
+   - Press **Enter**
+
+**8. Select Disk:**
+   ```
+   [ ] ada0    16.0 GB
+   ```
+   - Press **Spacebar** to select the disk (shows [X])
+   - Press **Enter**
+
+**9. Confirmation Warning:**
+   ```
+   !!! WARNING - THIS WILL ERASE THE DISK !!!
+   
+   Are you sure?
+   No / Yes
+   ```
+   - Use arrow keys to select **Yes**
+   - Press **Enter**
+
+**10. Installation Progress:**
+   - Installation will begin (takes 3-5 minutes)
+   - Progress shown: Extracting files, configuring system
+   - Wait for "Installation Complete!" message
+
+**11. Root Password:**
+   ```
+   Please enter a password for the root user:
+   Reenter password:
+   ```
+   - Type a strong password (e.g., `OPNsense2024!`)
+   - Press Enter
+   - Retype the same password
+   - Press Enter
+   - **IMPORTANT:** Write down this password!
+
+**12. Installation Complete:**
+   ```
+   Installation Complete!
+   
+   Manual Configuration
+   Reboot
+   ```
+   - Select **Reboot**
+   - Press **Enter**
+
+**13. Eject ISO After Reboot:**
+   
+   In PowerShell (Administrator):
+   ```powershell
+   # Stop VM
+   Stop-VM -Name "OPNsense-Lab" -Force
+   
+   # Eject ISO
+   Set-VMDvdDrive -VMName "OPNsense-Lab" -Path $null
+   
+   # Restart VM
+   Start-VM -Name "OPNsense-Lab"
+   
+   # Reconnect to console
+   vmconnect localhost "OPNsense-Lab"
+   ```
+
+### Step 3.5: Initial OPNsense Configuration
+
+After the VM reboots (takes 30-60 seconds), you'll see the OPNsense console menu.
+
+**Interface Assignment:**
+
+OPNsense will auto-detect your 2 network adapters:
+
+```
+Valid interfaces are:
+hn0  XX:XX:XX:XX:XX:XX (up)
+hn1  YY:YY:YY:YY:YY:YY (up)
+
+Do you want to set up VLANs now? [y/n]:
+```
+
+**1. VLANs:**
+   - Type: `n` (no VLANs needed)
+   - Press **Enter**
+
+**2. WAN Interface:**
+   ```
+   Enter the WAN interface name or 'a' for auto-detection:
+   ```
+   - Type: `hn0` (first adapter = Default Switch)
+   - Press **Enter**
+
+**3. LAN Interface:**
+   ```
+   Enter the LAN interface name or 'a' for auto-detection:
+   ```
+   - Type: `hn1` (second adapter = Internal-Lab)
+   - Press **Enter**
+
+**4. Optional Interface:**
+   ```
+   Enter the Optional 1 interface name or 'a' for auto-detection (or nothing if finished):
+   ```
+   - Just press **Enter** (leave empty)
+
+**5. Confirmation:**
+   ```
+   WAN  -> hn0
+   LAN  -> hn1
+   
+   Do you want to proceed? [y/n]:
+   ```
+   - Type: `y`
+   - Press **Enter**
+
+**Configure LAN IP Address:**
+
+You'll now see the main console menu:
+
+```
+*** Welcome to OPNsense ***
+WAN (wan)   -> hn0 -> [getting IP via DHCP...]
+LAN (lan)   -> hn1 -> 192.168.1.1
+
+0) Logout
+1) Assign Interfaces
+2) Set interface(s) IP address
+...
+Enter an option:
+```
+
+**1. Set LAN IP:**
+   - Type: `2` (Set interface(s) IP address)
+   - Press **Enter**
+
+**2. Select LAN:**
+   ```
+   Available interfaces:
+   1 - WAN
+   2 - LAN
+   
+   Enter the number of the interface:
+   ```
+   - Type: `2`
+   - Press **Enter**
+
+**3. Configure IPv4 Address:**
+   ```
+   Enter the new LAN IPv4 address:
+   ```
+   - Type: `10.0.1.1`
+   - Press **Enter**
+
+**4. Subnet Mask:**
+   ```
+   Enter the new LAN IPv4 subnet bit count (1-32):
+   ```
+   - Type: `24`
+   - Press **Enter**
+
+**5. Upstream Gateway:**
+   ```
+   For a LAN, press <ENTER> for none:
+   ```
+   - Just press **Enter** (no gateway for LAN)
+
+**6. IPv6 Configuration:**
+   ```
+   Configure IPv6 address LAN interface via DHCP6? [y/n]:
+   ```
+   - Type: `n`
+   - Press **Enter**
+
+**7. DHCP Server:**
+   ```
+   Do you want to enable the DHCP server on LAN? [y/n]:
+   ```
+   - Type: `y` (enable DHCP)
+   - Press **Enter**
+
+**8. DHCP Start Address:**
+   ```
+   Enter the start address of the range:
+   ```
+   - Type: `10.0.1.100`
+   - Press **Enter**
+
+**9. DHCP End Address:**
+   ```
+   Enter the end address of the range:
+   ```
+   - Type: `10.0.1.200`
+   - Press **Enter**
+
+**10. HTTP Protocol:**
+   ```
+   Do you want to revert to HTTP as the webConfigurator protocol? [y/n]:
+   ```
+   - Type: `y` (use HTTP for easier access)
+   - Press **Enter**
+
+**Success Message:**
+
+```
+The IPv4 LAN address has been set to 10.0.1.1/24
+You can now access the webConfigurator by opening http://10.0.1.1/
+```
+
+**Write down:**
+- **URL:** http://10.0.1.1
+- **Username:** root
+- **Password:** (your password from installation)
+
+Press **Enter** to return to main menu.
+
+**✅ OPNsense Installation Complete!**
+
+Your OPNsense firewall is now:
+- ✅ Installed and running
+- ✅ WAN interface on Default Switch (will get NAT internet)
+- ✅ LAN interface on 10.0.1.1/24
+- ✅ DHCP server enabled (10.0.1.100-200)
+- ✅ Web interface accessible at http://10.0.1.1
+
+**Next:** Access the web interface from your host PC to configure VPN and firewall rules.
+
+---
 
 ### Method 2: Hyper-V Manager GUI (Step-by-Step)
 
