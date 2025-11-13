@@ -1,15 +1,17 @@
-# Lab 4: On-Premises Setup Guide - Hyper-V + pfSense + S2S VPN
+# Lab 4: On-Premises Setup Guide - Hyper-V + Windows Server Router + S2S VPN
 
 ## 📋 Overview
 
-This guide walks you through setting up the **on-premises environment** on your **Windows 11 Pro PC** to simulate a real datacenter with:
+This guide walks you through setting up the **on-premises environment** on your **Windows 11 PC** to simulate a real datacenter with:
 - ✅ Hyper-V virtualization
-- ✅ pfSense firewall (blocking all internet traffic)
+- ✅ Windows Server 2022 Router (RRAS with NAT and VPN)
 - ✅ Windows Server 2022 (Arc-enabled server)
 - ✅ Site-to-Site VPN to Azure
 
-**Operating System:** Windows 11 Pro (or Windows 10 Pro)  
+**Operating System:** Windows 11 Pro/Enterprise (ARM64 or x64)  
 **Time required:** 2-3 hours (first time)
+
+**✨ ARM64 Compatible:** This guide uses Generation 2 VMs and works on ARM64 devices (Snapdragon X Elite/Plus)
 
 **⚠️ CRITICAL:** This guide assumes you have **NOT** completed any previous steps. We'll validate everything as we go.
 
@@ -18,17 +20,18 @@ This guide walks you through setting up the **on-premises environment** on your 
 ## 🎯 What You'll Build
 
 ```
-Your Windows PC (Physical)
+Your Windows PC (Physical - ARM64 or x64)
 ├── Hyper-V Host
-│   ├── VM1: pfSense Firewall
+│   ├── VM1: Windows Server 2022 Router
 │   │   ├── WAN NIC → Your PC's internet (for VPN only)
 │   │   ├── LAN NIC → Internal network (10.0.1.0/24)
+│   │   ├── RRAS Role → NAT + Routing + VPN
 │   │   ├── VPN Tunnel → Azure VPN Gateway
-│   │   └── Firewall Rules → Block all except VPN
+│   │   └── Windows Firewall → Block all except VPN
 │   │
-│   └── VM2: Windows Server 2022
-│       ├── NIC → pfSense LAN (10.0.1.10/24)
-│       ├── Gateway → pfSense (10.0.1.1)
+│   └── VM2: Windows Server 2022 (Arc Server)
+│       ├── NIC → Router LAN (10.0.1.10/24)
+│       ├── Gateway → Router (10.0.1.1)
 │       ├── DNS → Azure Firewall via VPN (10.100.0.4)
 │       ├── NO direct internet access
 │       └── Azure Arc Agent → Uses proxy via VPN
@@ -88,7 +91,121 @@ if (Test-Path $deploymentFile) {
 
 **⚠️ If deployment file is missing, STOP HERE and deploy Azure first!**
 
-### Step 0.3: Check Hardware Requirements
+### Step 0.3: Configure Azure Firewall Application Rules
+
+**⚠️ CRITICAL:** These rules must be configured **BEFORE** attempting Arc onboarding!
+
+Azure Firewall Explicit Proxy requires **Application Rules** (Network Rules will NOT work) to allow Arc endpoints.
+
+```powershell
+# Load deployment info
+$deploymentFile = "C:\Users\$env:USERNAME\MyProjects\azfw\scripts\Lab4-Arc-DeploymentInfo.json"
+$azureInfo = Get-Content $deploymentFile | ConvertFrom-Json
+
+Write-Host "`n╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║  Configure Azure Firewall Application Rules  ║" -ForegroundColor Cyan
+Write-Host "╚══════════════════════════════════════════════╝`n" -ForegroundColor Cyan
+
+Write-Host "Resource Group: $($azureInfo.ResourceGroup)" -ForegroundColor Yellow
+Write-Host "Firewall: $($azureInfo.AzureFirewall.Name)" -ForegroundColor Yellow
+Write-Host "`nYou must create Application Rules in Azure Portal...`n" -ForegroundColor White
+```
+
+**Steps to Configure in Azure Portal:**
+
+1. **Open Azure Portal:** https://portal.azure.com
+
+2. **Navigate to Firewall Policy:**
+   - Search for "Firewall Policies"
+   - Select your policy (should match deployment)
+
+3. **Add Application Rule Collection:**
+   - Left menu → **Application Rules**
+   - Click **+ Add a rule collection**
+
+4. **Rule Collection Settings:**
+   - **Name:** `Arc-Required-Endpoints`
+   - **Priority:** `100`
+   - **Rule collection action:** `Allow`
+
+5. **Add Rules - Critical Arc Endpoints:**
+
+   **Rule 1: Arc Agent Download**
+   - Name: `Allow-Arc-Download`
+   - Source type: `IP Address`
+   - Source: `*` (or your on-premises subnet, e.g., `10.0.1.0/24`)
+   - Protocol: `http:80,https:443`
+   - Destination type: `FQDN`
+   - Destination:
+     ```
+     aka.ms
+     download.microsoft.com
+     *.download.microsoft.com
+     packages.microsoft.com
+     ```
+
+   **Rule 2: Arc Core Services**
+   - Name: `Allow-Arc-Core`
+   - Source type: `IP Address`
+   - Source: `*`
+   - Protocol: `http:80,https:443`
+   - Destination type: `FQDN`
+   - Destination:
+     ```
+     *.his.arc.azure.com
+     *.guestconfiguration.azure.com
+     agentserviceapi.guestconfiguration.azure.com
+     ```
+
+   **Rule 3: Azure Management**
+   - Name: `Allow-Azure-Management`
+   - Source type: `IP Address`
+   - Source: `*`
+   - Protocol: `http:80,https:443`
+   - Destination type: `FQDN`
+   - Destination:
+     ```
+     management.azure.com
+     login.microsoftonline.com
+     login.windows.net
+     pas.windows.net
+     ```
+
+   **Rule 4: Extension Services**
+   - Name: `Allow-Arc-Extensions`
+   - Source type: `IP Address`
+   - Source: `*`
+   - Protocol: `http:80,https:443`
+   - Destination type: `FQDN`
+   - Destination:
+     ```
+     guestnotificationservice.azure.com
+     *.guestnotificationservice.azure.com
+     *.servicebus.windows.net
+     *.blob.core.windows.net
+     ```
+
+6. **Click "Add"** to save the rule collection
+
+7. **Verify Rules:**
+   - Ensure all 4 rules show under `Arc-Required-Endpoints` collection
+   - Priority should be `100`
+   - Action should be `Allow`
+
+**⚠️ IMPORTANT:** Wait 2-3 minutes for rules to propagate before proceeding!
+
+**Verification Command:**
+```powershell
+# Test if proxy can reach Arc endpoints (run AFTER creating rules)
+curl -x http://10.100.0.4:8443 https://aka.ms -UseBasicParsing
+curl -x http://10.100.0.4:8443 https://management.azure.com -UseBasicParsing
+```
+
+✅ **Rules configured? Continue to Step 0.4**
+
+---
+
+### Step 0.4: Check Hardware Requirements
 
 ```powershell
 Write-Host "`n=== HARDWARE CHECK ===" -ForegroundColor Cyan
@@ -141,7 +258,7 @@ if ($isARM64) {
 }
 ```
 
-### Step 0.4: Download Required ISOs
+### Step 0.4: Download Windows Server 2022 ISO
 
 **Create download directory:**
 
@@ -150,49 +267,7 @@ if ($isARM64) {
 New-Item -ItemType Directory -Path "C:\ISOs" -Force
 ```
 
-**Download 1: pfSense**
-
-> **IMPORTANT**: pfSense downloads as `.iso.gz` (compressed), you must **extract** it first!
-
-1. Open browser and go to: https://www.pfsense.org/download/
-2. Configuration:
-   - **Architecture:** AMD64 (64-bit)
-   - **Installer:** DVD Image (ISO)
-   - **Mirror:** Choose closest location
-3. Click "Download"
-4. You'll get: `netgate-installer-amd64.iso.gz` (compressed file ~320 MB)
-   > **Note**: The downloaded file may have a generic name like `netgate-installer-amd64.iso.gz`
-5. **Extract the ISO**:
-   - **Option A (7-Zip - Recommended)**: 
-     - Download 7-Zip from https://www.7-zip.org/ if not installed
-     - Right-click the `.iso.gz` file → "7-Zip" → "Extract Here"
-     - Move extracted ISO to `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso`
-   
-   - **Option B (PowerShell)**:
-     ```powershell
-     # Find the downloaded .gz file (may have different name)
-     $gzFile = "$env:USERPROFILE\Downloads\netgate-installer-amd64.iso.gz"
-     $isoFile = "C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso"
-     
-     # Create ISOs directory
-     New-Item -ItemType Directory -Path "C:\ISOs" -Force | Out-Null
-     
-     # Extract (using proper variable names to avoid $input conflict)
-     $inputStream = [System.IO.File]::OpenRead($gzFile)
-     $gzipStream = New-Object System.IO.Compression.GzipStream($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
-     $outputStream = [System.IO.File]::Create($isoFile)
-     $gzipStream.CopyTo($outputStream)
-     $outputStream.Close()
-     $gzipStream.Close()
-     $inputStream.Close()
-     
-     $sizeMB = [math]::Round((Get-Item $isoFile).Length / 1MB, 2)
-     Write-Host "✓ Extracted to: $isoFile ($sizeMB MB)" -ForegroundColor Green
-     ```
-6. Final file: `C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso` (~995 MB)
-7. Wait for extraction to complete
-
-**Download 2: Windows Server 2022**
+**Download Windows Server 2022 (You'll need 2 copies for Router + Arc Server)**
 
 1. Go to: https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022
 2. Fill in registration form (required by Microsoft)
@@ -201,33 +276,27 @@ New-Item -ItemType Directory -Path "C:\ISOs" -Force
 5. Click "Download"
 6. Downloaded filename: `SERVER_EVAL_x64FRE_en-us.iso`
 7. Move/copy to: `C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso`
-   > **Note**: You can keep the original filename or rename to `WS2022-Eval.iso`
 8. Size: ~5 GB
 9. Wait for download (may take 10-30 minutes depending on connection)
 
-**Verify downloads:**
+> **Note:** You'll use the same ISO to install both VMs (Router and Arc Server)
+
+**Verify download:**
 
 ```powershell
-# Check ISO files exist (using actual filenames)
-$pfSenseIso = "C:\ISOs\pfSense-CE-2.7.2-RELEASE-amd64.iso"
+# Check ISO file exists
 $ws2022Iso = "C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso"
-
-if (Test-Path $pfSenseIso) {
-    $size = [math]::Round((Get-Item $pfSenseIso).Length / 1MB, 2)
-    Write-Host "✓ pfSense ISO found ($size MB)" -ForegroundColor Green
-} else {
-    Write-Host "✗ pfSense ISO NOT found at: $pfSenseIso" -ForegroundColor Red
-}
 
 if (Test-Path $ws2022Iso) {
     $size = [math]::Round((Get-Item $ws2022Iso).Length / 1MB, 2)
     Write-Host "✓ Windows Server 2022 ISO found ($size MB)" -ForegroundColor Green
 } else {
     Write-Host "✗ Windows Server 2022 ISO NOT found at: $ws2022Iso" -ForegroundColor Red
+    Write-Host "  Please download from: https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022" -ForegroundColor Yellow
 }
 ```
 
-**⚠️ Do NOT proceed until both ISOs are downloaded!**
+**⚠️ Do NOT proceed until ISO is downloaded!**
 
 ---
 
@@ -305,6 +374,8 @@ Hyper-V Manager window should open. You'll use this GUI frequently.
 > 2. Type: `PowerShell`
 > 3. Right-click "Windows PowerShell" → **Run as administrator**
 > 4. Click "Yes" on UAC prompt
+
+> **🔒 Network Impact Clarification**: Creating these virtual switches will **NOT** affect your host computer's networking or internet connectivity. The External switch shares your physical network adapter while preserving host connectivity through the `AllowManagementOS=$true` setting. The Internal switch creates an isolated network segment only for VM-to-VM communication within Hyper-V.
 
 ### Create External Switch (for internet/VPN)
 
