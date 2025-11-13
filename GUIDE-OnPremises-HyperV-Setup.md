@@ -495,19 +495,31 @@ Write-Host "  • Internal-Lab: VM-to-VM communication (10.0.1.0/24)" -Foregroun
 Write-Host "  • Your WiFi/Ethernet: Unaffected and working normally" -ForegroundColor Cyan
 ```
 
-### ✅ Internal-Lab Switch Already Created
+### Create Internal-Lab Switch (If Not Already Created)
 
-**Your connectivity fix already created this switch!**
+Check if the Internal-Lab switch exists, and create it if needed:
 
 ```powershell
-# Verify Internal-Lab switch exists
+# Check if Internal-Lab switch exists
 $internalSwitch = Get-VMSwitch -Name "Internal-Lab" -ErrorAction SilentlyContinue
 
 if ($internalSwitch) {
-    Write-Host "✓ Internal-Lab switch verified" -ForegroundColor Green
+    Write-Host "✓ Internal-Lab switch already exists" -ForegroundColor Green
     Write-Host "  This switch provides isolated VM-to-VM communication" -ForegroundColor White
 } else {
-    Write-Host "❌ Internal-Lab switch missing - run connectivity fix again" -ForegroundColor Red
+    Write-Host "Creating Internal-Lab switch..." -ForegroundColor Yellow
+    
+    # Create Internal-Lab switch for VM-to-VM communication
+    New-VMSwitch -Name "Internal-Lab" -SwitchType Internal
+    
+    # Configure IP address for the Internal-Lab switch on host
+    $adapter = Get-NetAdapter | Where-Object { $_.Name -like "*Internal-Lab*" }
+    New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress 10.0.1.254 -PrefixLength 24 -ErrorAction SilentlyContinue
+    
+    Write-Host "✓ Internal-Lab switch created!" -ForegroundColor Green
+    Write-Host "  - Type: Internal (VM-to-VM isolation)" -ForegroundColor White
+    Write-Host "  - Subnet: 10.0.1.0/24" -ForegroundColor White
+    Write-Host "  - Host IP: 10.0.1.254" -ForegroundColor White
 }
 ```
 
@@ -603,8 +615,8 @@ if ($vmGeneration -eq 1) {
 # Create VM folder
 New-Item -Path "C:\Hyper-V\OPNsense-Lab" -ItemType Directory -Force
 
-# Create virtual hard disk (larger for OPNsense features)
-New-VHD -Path "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" -SizeBytes 16GB -Dynamic
+# Create virtual hard disk (32GB minimum for OPNsense ZFS installation)
+New-VHD -Path "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" -SizeBytes 32GB -Dynamic
 
 # Create VM with appropriate generation for platform
 New-VM -Name "OPNsense-Lab" `
