@@ -245,7 +245,7 @@ if ($allBlocked) {
     Write-Host "  All traffic must go through VPN + Azure Firewall" -ForegroundColor Green
 } else {
     Write-Host "`n✗ SECURITY WARNING: Direct internet access detected!" -ForegroundColor Red
-    Write-Host "  Check pfSense firewall rules" -ForegroundColor Yellow
+    Write-Host "  Check Windows Server Router firewall rules" -ForegroundColor Yellow
 }
 
 # Test 5.2: Verify proxy still works
@@ -410,7 +410,7 @@ Server: $env:COMPUTERNAME
 --------------------------------------------------------------------
 NETWORK CONNECTIVITY
 --------------------------------------------------------------------
-pfSense Gateway (10.0.1.1):          $((Test-NetConnection 10.0.1.1 -WarningAction SilentlyContinue).PingSucceeded)
+Windows Server Router (10.0.1.1):    $((Test-NetConnection 10.0.1.1 -WarningAction SilentlyContinue).PingSucceeded)
 Azure Firewall (10.100.0.4):         $((Test-NetConnection 10.100.0.4 -WarningAction SilentlyContinue).PingSucceeded)
 HTTP Proxy Port (8081):               $((Test-NetConnection 10.100.0.4 -Port 8081 -WarningAction SilentlyContinue).TcpTestSucceeded)
 HTTPS Proxy Port (8443):              $((Test-NetConnection 10.100.0.4 -Port 8443 -WarningAction SilentlyContinue).TcpTestSucceeded)
@@ -460,7 +460,7 @@ Get-Content $reportFile
 
 ### All Tests Should Show:
 
-1. **Network Connectivity:** ✓ All 4 tests pass (pfSense, Azure Firewall, ports 8081/8443)
+1. **Network Connectivity:** ✓ All 4 tests pass (Windows Server Router, Azure Firewall, ports 8081/8443)
 2. **Proxy Configuration:** ✓ Environment variables set, Arc agent configured
 3. **Arc Agent Status:** ✓ Status = Connected, heartbeat recent
 4. **Endpoint Reachability:** ✓ All required endpoints show "Reachable"
@@ -493,12 +493,12 @@ Your lab is **fully validated** if:
 **Cause:** VPN tunnel down  
 **Solution:**
 ```powershell
-# Check VPN status on pfSense
-# Navigate to: Status → IPsec → Overview
-# Status should be: ESTABLISHED (green)
+# Check VPN status on Windows Server Router
+# Navigate to: Server Manager → RRAS → Network Interfaces
+# Status should be: Connected (for Demand Dial Interface)
 
 # If not, reconnect:
-# Click "Connect VPN" button
+# Right-click interface → Connect
 ```
 
 ### Test 2 Failed: Proxy Configuration
@@ -551,11 +551,11 @@ Get-AzFirewallPolicyRuleCollectionGroup `
 **Symptoms:** Can reach google.com directly  
 **Solution:**
 ```powershell
-# Check pfSense firewall rules
-# Navigate to: Firewall → Rules → LAN
+# Check Windows Server Router firewall rules
+# Navigate to: Windows Firewall with Advanced Security → Outbound Rules
 # Ensure:
-#  - Default "allow all" rule is DELETED
-#  - Only specific rules for pfSense and Azure VNet exist
+#  - "Block Internet Outbound" rule exists and is enabled
+#  - "Allow Azure VPN" and "Allow Local Network" rules exist
 ```
 
 ### Test 7 Failed: Extension Won't Install

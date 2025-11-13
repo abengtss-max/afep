@@ -75,8 +75,8 @@ if ($result.PingSucceeded) {
     Write-Host "✓ Azure Firewall reachable via VPN ($firewallIP)" -ForegroundColor Green
 } else {
     Write-Host "✗ Cannot reach Azure Firewall" -ForegroundColor Red
-    Write-Host "  Check: S2S VPN status on pfSense" -ForegroundColor Yellow
-    Write-Host "  Go to: pfSense → Status → IPsec → Overview" -ForegroundColor Yellow
+    Write-Host "  Check: S2S VPN status on Windows Server Router" -ForegroundColor Yellow
+    Write-Host "  Go to: Server Manager → RRAS → Remote Access Management Console" -ForegroundColor Yellow
     Write-Host "  Status should be: ESTABLISHED (green)" -ForegroundColor Yellow
     exit 1
 }
@@ -110,7 +110,7 @@ try {
     $result = Test-NetConnection -ComputerName google.com -Port 443 -WarningAction SilentlyContinue -InformationLevel Quiet -ErrorAction Stop
     if ($result) {
         Write-Host "✗ SECURITY ISSUE: Internet is NOT blocked!" -ForegroundColor Red
-        Write-Host "  Check: pfSense firewall LAN rules" -ForegroundColor Yellow
+        Write-Host "  Check: Windows Server Router firewall rules" -ForegroundColor Yellow
         Write-Host "  Required: Delete default 'allow all' rule" -ForegroundColor Yellow
         exit 1
     }
@@ -153,10 +153,11 @@ Write-Host "══════════════════════�
 - Return here after VPN shows "ESTABLISHED"
 
 **Check 7 Failed (Internet not blocked):**
-- Open pfSense WebGUI: https://10.0.1.1
-- Go to: Firewall → Rules → LAN
-- Delete the default "allow all" rule
-- Keep only: "Allow to pfSense" and "Allow to Azure via VPN"
+- RDP to Windows Server Router: 10.0.1.1
+- Open: Windows Firewall with Advanced Security
+- Go to: Outbound Rules
+- Ensure "Block Internet Outbound" rule exists and is enabled
+- Keep only: "Allow to Azure via VPN" and "Allow Local Network"
 
 **Check 8 Warning (DNS):**
 - This is OK, we'll configure it in Step 8
@@ -640,7 +641,7 @@ azcmagent config list | Select-String "proxy"
 # Test VPN connectivity
 Test-NetConnection 10.100.0.4 -Port 8081
 
-# If VPN is down, check pfSense: Status → IPsec
+# If VPN is down, check Windows Server Router: RRAS Console → Network Interfaces
 ```
 
 ### Issue 3: "Authentication failed"
