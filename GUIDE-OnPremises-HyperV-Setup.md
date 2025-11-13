@@ -744,121 +744,171 @@ Write-Host "Follow the installation wizard in the VM console window" -Foreground
 
 ### Step 3.4: OPNsense Installation Wizard
 
-The VM console will show the OPNsense boot menu. Follow these steps carefully:
+The VM console will show the OPNsense installer automatically. Follow these steps carefully:
 
-**1. Boot Menu (30-60 seconds):**
-   - You'll see the OPNsense boot menu
-   - Wait for auto-boot or press **Enter**
-   - OPNsense will load into live mode
-
-**2. Login to Console:**
-   ```
-   login: installer
-   password: opnsense
-   ```
-   - Type `installer` and press Enter
-   - Type `opnsense` and press Enter
-
-**3. Start Installation:**
-   ```
-   installer@OPNsense:~ $ opnsense-install
-   ```
-   - Type `opnsense-install` and press Enter
-
-**4. Keymap Selection:**
-   ```
-   Select a Keymap
-   >>> Continue with default keymap
-       Test keymap
-       Select keymap from list
-   ```
-   - Press **Enter** to use default US keymap
-   - Or select your keyboard layout if different
-
-**5. Partitioning Method:**
-   ```
-   Partitioning
-   >>> Auto (ZFS)
-       Shell
-       Auto (UFS) BIOS
-       Auto (UFS) UEFI
-       Manual
-   ```
-   - Use arrow keys to select **Auto (ZFS)**
-   - Press **Enter**
-
-**6. ZFS Installation Type:**
-   ```
-   >>> Install - Proceed with installation
-       Shell - Open a shell for manual setup
-   ```
-   - Select **Install**
-   - Press **Enter**
-
-**7. ZFS Pool Type:**
-   ```
-   >>> stripe - No redundancy
-       mirror - N-Way mirroring
-       raid10 - Striped mirror
-   ```
-   - Select **stripe** (we only have 1 disk)
-   - Press **Spacebar** to select
-   - Press **Enter**
-
-**8. Select Disk:**
-   ```
-   [ ] ada0    16.0 GB
-   ```
-   - Press **Spacebar** to select the disk (shows [X])
-   - Press **Enter**
-
-**9. Confirmation Warning:**
-   ```
-   !!! WARNING - THIS WILL ERASE THE DISK !!!
+**1. Network Interface Assignment (First Screen):**
    
-   Are you sure?
-   No / Yes
+   OPNsense will immediately show detected interfaces:
    ```
-   - Use arrow keys to select **Yes**
+   Valid interfaces are:
+   hn0    00:15:5d:44:6e:01 Hyper-V Network Interface
+   hn1    00:15:5d:44:6e:02 Hyper-V Network Interface
+   
+   If you do not know the names of your interfaces, you may choose to use
+   auto-detection. In that case, disconnect all interfaces now before
+   hitting 'a' to initiate auto detection.
+   
+   Enter the WAN interface name or 'a' for auto-detection:
+   ```
+   
+   - Type: **`hn0`** (WAN = Default Switch for internet)
+   - Press **Enter**
+   - You'll see: "Note: this enables full firewalling/nat mode."
+   - Press **Enter** to continue
+   
+   ```
+   Enter the LAN interface name or 'a' for auto-detection:
+   ```
+   
+   - Type: **`hn1`** (LAN = Internal-Lab for VMs)
+   - Press **Enter**
+   
+   ```
+   Enter the Optional interface name or 'a' for auto-detection
+   (or nothing if finished):
+   ```
+   
+   - Press **Enter** (leave empty, no optional interfaces)
+   
+   **Wait 10-30 seconds** for "No link-up detected" messages to clear (this is normal)
+
+**2. Keymap Selection:**
+   ```
+   The system console driver for FreeBSD defaults to standard "US"
+   keyboard map. Other keymaps can be chosen below.
+   
+   >>> Continue with default keymap
+       Test default keymap
+       ( ) Armenian phonetic layout
+       ( ) Belarusian
+       ...
+   ```
+   - Press **Enter** to accept default US keymap
+   - Or use arrow keys to select your keyboard layout
+
+**3. Installation Menu:**
+   ```
+   OPNsense 25.7
+   
+   Choose one of the following tasks to perform.
+   
+   Install (ZFS)     ZFS GPT/UEFI Hybrid
+   Install (UFS)     UFS GPT/UEFI Hybrid
+   Other Modes >>    Extended Installation
+   Import Config     Load Configuration
+   Password Reset    Recover Installation
+   Force Reboot      Reboot System
+   Force Halt        Power Down System
+   ```
+   - Select **Install (ZFS)** (should be highlighted by default)
    - Press **Enter**
 
-**10. Installation Progress:**
-   - Installation will begin (takes 3-5 minutes)
-   - Progress shown: Extracting files, configuring system
-   - Wait for "Installation Complete!" message
-
-**11. Root Password:**
+**4. ZFS Pool Type:**
    ```
-   Please enter a password for the root user:
-   Reenter password:
+   >>> stripe - No redundancy, no parity, fast
+       mirror - N-Way mirroring
+       raid10 - Striped mirror pairs
+       raidz1 - Single parity RAID
+       raidz2 - Double parity RAID
+       raidz3 - Triple parity RAID
+   ```
+   - Select **stripe** (single disk, no redundancy needed)
+   - Press **Enter**
+
+**5. Select Disk:**
+   ```
+   [ ] ada0    32.0 GB    MSFT Virtual HD
+   ```
+   - Press **Spacebar** to select the disk (checkbox shows [X])
+   - Press **Enter**
+
+**6. Last Chance Confirmation:**
+   ```
+   !!! WARNING !!!
+   
+   Destruction of data on the target device is imminent!
+   A BACKUP is advised.
+   
+   <<< Cancel    Destroy >>>
+   ```
+   - Use arrow keys or Tab to select **Destroy**
+   - Press **Enter**
+
+**7. Installation Progress (5-10 minutes):**
+   
+   The installer will:
+   - Create ZFS pool and filesystems
+   - Extract base system (~600 MB)
+   - Install packages
+   - Configure bootloader
+   
+   You'll see progress:
+   ```
+   Fetching distribution files...
+   Extracting FreeBSD base system...
+   Installing OPNsense packages...
+   Configuring system...
+   ```
+   
+   **Wait patiently** - this takes 5-10 minutes depending on ISO speed
+
+**8. Root Password:**
+   ```
+   Please select a password for the root user:
+   
+   New Password: 
    ```
    - Type a strong password (e.g., `OPNsense2024!`)
-   - Press Enter
+   - Press **Enter**
+   
+   ```
+   Retype New Password:
+   ```
    - Retype the same password
-   - Press Enter
+   - Press **Enter**
    - **IMPORTANT:** Write down this password!
 
-**12. Installation Complete:**
+**9. Installation Complete:**
    ```
    Installation Complete!
    
-   Manual Configuration
-   Reboot
+   Would you like to enter the shell to perform manual configuration?
+   
+   No / Yes
    ```
-   - Select **Reboot**
+   - Select **No** (we'll configure via console menu)
    - Press **Enter**
 
-**13. Eject ISO After Reboot:**
+**10. Reboot:**
+   ```
+   The system will now reboot...
+   ```
+   - VM will restart automatically
+   - **Wait 30-60 seconds** for reboot
+
+**11. Eject ISO After Reboot:**
+   
+   After the VM reboots, **IMPORTANT:** Eject the ISO to prevent booting from DVD again.
    
    In PowerShell (Administrator):
    ```powershell
-   # Stop VM
+   # Stop VM (after it finishes rebooting, wait for login prompt)
    Stop-VM -Name "OPNsense-Lab" -Force
    
    # Eject ISO
    Set-VMDvdDrive -VMName "OPNsense-Lab" -Path $null
    
-   # Restart VM
+   # Restart VM (will boot from hard disk now)
    Start-VM -Name "OPNsense-Lab"
    
    # Reconnect to console
@@ -867,57 +917,38 @@ The VM console will show the OPNsense boot menu. Follow these steps carefully:
 
 ### Step 3.5: Initial OPNsense Configuration
 
-After the VM reboots (takes 30-60 seconds), you'll see the OPNsense console menu.
-
-**Interface Assignment:**
-
-OPNsense will auto-detect your 2 network adapters:
+After the VM reboots from hard disk (takes 30-60 seconds), you'll see the OPNsense login prompt:
 
 ```
-Valid interfaces are:
-hn0  XX:XX:XX:XX:XX:XX (up)
-hn1  YY:YY:YY:YY:YY:YY (up)
+OPNsense 25.7 (amd64)
+opnsense.localdomain
 
-Do you want to set up VLANs now? [y/n]:
+login:
 ```
 
-**1. VLANs:**
-   - Type: `n` (no VLANs needed)
-   - Press **Enter**
+**Login:**
+- Username: **`root`**
+- Password: **[the password you set during installation]**
 
-**2. WAN Interface:**
-   ```
-   Enter the WAN interface name or 'a' for auto-detection:
-   ```
-   - Type: `hn0` (first adapter = Default Switch)
-   - Press **Enter**
+**Main Console Menu:**
 
-**3. LAN Interface:**
-   ```
-   Enter the LAN interface name or 'a' for auto-detection:
-   ```
-   - Type: `hn1` (second adapter = Internal-Lab)
-   - Press **Enter**
+After login, you'll see the console menu:
 
-**4. Optional Interface:**
-   ```
-   Enter the Optional 1 interface name or 'a' for auto-detection (or nothing if finished):
-   ```
-   - Just press **Enter** (leave empty)
+```
+*** OPNsense.localdomain: OPNsense 25.7 (amd64/OpenSSL) ***
 
-**5. Confirmation:**
-   ```
-   WAN  -> hn0
-   LAN  -> hn1
-   
-   Do you want to proceed? [y/n]:
-   ```
-   - Type: `y`
-   - Press **Enter**
+  0) Logout                              7) Ping host
+  1) Assign interfaces                   8) Shell
+  2) Set interface(s) IP address         9) pfTop
+  3) Reset the root password            10) Firewall log
+  4) Reset to factory defaults          11) Reload all services
+  5) Power off system                   12) Update from console
+  6) Reboot system                      13) Restore configuration
+
+Enter an option:
+```
 
 **Configure LAN IP Address:**
-
-You'll now see the main console menu:
 
 ```
 *** Welcome to OPNsense ***
