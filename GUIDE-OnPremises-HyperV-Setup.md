@@ -321,23 +321,25 @@ if (Test-Path $ws2022Iso) {
 
 **Download OPNsense 25.7 (Latest Stable):**
 
-1. **Visit OPNsense Download Page:** https://opnsense.org/download/
-2. **Select Configuration:**
-   - **Architecture:** `amd64` (works on both x64 and ARM64)
-   - **Image Type:** `vga` (VGA installer with live system)
-   - **Mirror:** Choose closest location (e.g., US mirrors for best speed)
+**⚠️ IMPORTANT:** Use **DVD ISO** for Intel/AMD x64 systems (best compatibility)!
 
-3. **Download Image:**
-   - **Direct Link:** https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-vga-amd64.img.bz2
-   - **Size:** ~450 MB compressed (~1 GB extracted)
-   - **SHA256:** `705e112e3c0566e6e568605173a8353a51d48074d48facf5c5831d2a0f7fb175`
+1. **Download DVD ISO (Recommended for x64):**
+   - **Direct Link:** https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-dvd-amd64.iso.bz2
+   - **Size:** ~580 MB compressed (~2 GB extracted)
+   - **Works with:** Intel/AMD x64 (Generation 1 VMs)
+   - **Boots reliably** on standard PC hardware
 
-4. **Extract Image:**
+2. **Alternative: VGA Image (for reference only):**
+   - **Link:** https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-vga-amd64.img.bz2
+   - **Size:** ~450 MB compressed
+   - **Note:** Requires conversion to VHDX (more complex)
+
+3. **Download and Extract:**
 
 ```powershell
-# Download to ISOs folder
-$downloadUrl = "https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-vga-amd64.img.bz2"
-$downloadPath = "C:\ISOs\OPNsense-25.7-vga-amd64.img.bz2"
+# Download DVD ISO to ISOs folder
+$downloadUrl = "https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-dvd-amd64.iso.bz2"
+$downloadPath = "C:\ISOs\OPNsense-25.7-dvd-amd64.iso.bz2"
 
 # Download using PowerShell (if needed)
 if (-not (Test-Path $downloadPath)) {
@@ -363,35 +365,14 @@ if (Test-Path $sevenZipPath) {
 }
 ```
 
-5. **Convert to Hyper-V Format:**
-
-```powershell
-# Convert raw image to VHDX for Hyper-V
-$sourceImg = "C:\ISOs\OPNsense-25.7-vga-amd64.img"
-$targetVhdx = "C:\ISOs\OPNsense-25.7-base.vhdx"
-
-if (Test-Path $sourceImg) {
-    Write-Host "Converting image to VHDX format..." -ForegroundColor Yellow
-    
-    # Create VHDX from raw image
-    # Note: This requires qemu-img or similar tool
-    # Alternative: Use the raw image directly (see VM creation steps)
-    
-    Write-Host "✓ Raw image ready for VM creation" -ForegroundColor Green
-} else {
-    Write-Host "✗ OPNsense image not found!" -ForegroundColor Red
-    Write-Host "  Please extract the .bz2 file manually" -ForegroundColor Yellow
-}
-```
-
 **Verify Downloads:**
 
 ```powershell
 # Check both ISOs are ready
 $ws2022Iso = "C:\ISOs\SERVER_EVAL_x64FRE_en-us.iso"
-$opnsenseImg = "C:\ISOs\OPNsense-25.7-vga-amd64.img"
+$opnsenseIso = "C:\ISOs\OPNsense-25.7-dvd-amd64.iso"
 
-Write-Host "`n=== ISO/Image Verification ===" -ForegroundColor Cyan
+Write-Host "`n=== ISO Verification ===" -ForegroundColor Cyan
 
 if (Test-Path $ws2022Iso) {
     $size = [math]::Round((Get-Item $ws2022Iso).Length / 1GB, 2)
@@ -400,16 +381,20 @@ if (Test-Path $ws2022Iso) {
     Write-Host "✗ Windows Server 2022 ISO missing" -ForegroundColor Red
 }
 
-if (Test-Path $opnsenseImg) {
-    $size = [math]::Round((Get-Item $opnsenseImg).Length / 1MB, 2)
-    Write-Host "✓ OPNsense Image: $size MB" -ForegroundColor Green
+if (Test-Path $opnsenseIso) {
+    $size = [math]::Round((Get-Item $opnsenseIso).Length / 1GB, 2)
+    Write-Host "✓ OPNsense DVD ISO: $size GB" -ForegroundColor Green
 } else {
-    Write-Host "✗ OPNsense Image missing" -ForegroundColor Red
+    Write-Host "✗ OPNsense DVD ISO missing" -ForegroundColor Red
     Write-Host "  Download from: https://opnsense.org/download/" -ForegroundColor Yellow
 }
 ```
 
-**⚠️ Do NOT proceed until BOTH files are downloaded and verified!**
+```powershell
+Write-Host "`n✅ Both ISOs ready! Proceed to Step 1" -ForegroundColor Green
+```
+
+**⚠️ Do NOT proceed until BOTH ISOs are downloaded and verified!**
 
 ---
 
