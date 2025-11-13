@@ -620,13 +620,13 @@ New-VHD -Path "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" -SizeBytes 32GB -Dynam
 
 # Create VM with appropriate generation for platform
 New-VM -Name "OPNsense-Lab" `
-       -MemoryStartupBytes 2GB `
+       -MemoryStartupBytes 4GB `
        -Generation $vmGeneration `
        -VHDPath "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx" `
        -Path "C:\Hyper-V"
 
-# Configure VM settings for OPNsense
-Set-VM -Name "OPNsense-Lab" -ProcessorCount 2 -DynamicMemory -MemoryStartupBytes 2GB -MemoryMinimumBytes 1GB -MemoryMaximumBytes 4GB
+# Configure VM settings for OPNsense (minimum 3GB RAM required for installation)
+Set-VM -Name "OPNsense-Lab" -ProcessorCount 2 -DynamicMemory -MemoryStartupBytes 4GB -MemoryMinimumBytes 2GB -MemoryMaximumBytes 8GB
 
 # Use Default Switch for NAT internet access (created during connectivity fix)
 $natSwitch = Get-VMSwitch | Where-Object { $_.Name -eq "Default Switch" } | Select-Object -First 1
