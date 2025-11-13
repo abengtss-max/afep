@@ -660,45 +660,54 @@ Get-VMNetworkAdapter -VMName "OPNsense-Lab" | Format-Table Name, SwitchName, Mac
 # - Adapter 2: Internal-Lab (LAN)
 ```
 
-### Step 3.3: Install OPNsense from Image or ISO
+### Step 3.3: Install OPNsense from ISO
 
 > **📍 YOU ARE HERE** if you manually created the VM following my instructions.
 
-**Option A: Copy Image to VHD (Faster)**
+**Download OPNsense DVD ISO:**
 
 ```powershell
-# Stop VM if running
-Stop-VM -Name "OPNsense-Lab" -Force -ErrorAction SilentlyContinue
+# Download OPNsense DVD ISO (easier than .img method)
+$downloadUrl = "https://pkg.opnsense.org/releases/25.7/OPNsense-25.7-dvd-amd64.iso.bz2"
+$downloadPath = "C:\ISOs\OPNsense-25.7-dvd-amd64.iso.bz2"
 
-# Mount VHDX and copy OPNsense image directly
-$vhdPath = "C:\Hyper-V\OPNsense-Lab\OPNsense-Lab.vhdx"
-$opnsenseImg = "C:\ISOs\OPNsense-25.7-vga-amd64.img"
+Write-Host "Downloading OPNsense DVD ISO (~580 MB compressed)..." -ForegroundColor Yellow
+Invoke-WebRequest -Uri $downloadUrl -OutFile $downloadPath -UseBasicParsing
 
-# This requires admin tools - use alternative method below if this fails
-Write-Host "Copying OPNsense image to VM disk..." -ForegroundColor Yellow
+Write-Host "✓ Download complete!" -ForegroundColor Green
+Write-Host "Extracting ISO..." -ForegroundColor Yellow
 
-# Use DD for Windows or similar tool to copy raw image
-# For simplicity, we'll use the boot from ISO method instead
+# Extract with 7-Zip
+$sevenZip = "${env:ProgramFiles}\7-Zip\7z.exe"
+if (Test-Path $sevenZip) {
+    & $sevenZip x $downloadPath -o"C:\ISOs\" -y
+    Write-Host "✓ ISO ready: C:\ISOs\OPNsense-25.7-dvd-amd64.iso" -ForegroundColor Green
+} else {
+    Write-Host "⚠️ Install 7-Zip first: https://www.7-zip.org/download.html" -ForegroundColor Yellow
+    Write-Host "Then manually extract the .bz2 file to C:\ISOs\" -ForegroundColor White
+}
 ```
 
-**Option B: Boot from Converted ISO (Recommended)**
+**Mount ISO and Start VM:**
 
 ```powershell
-# Convert OPNsense image to ISO format for easier booting
-# We'll mount the image as DVD and install normally
+# Verify ISO exists
+if (-not (Test-Path "C:\ISOs\OPNsense-25.7-dvd-amd64.iso")) {
+    Write-Host "✗ ISO not found! Extract the .bz2 file first" -ForegroundColor Red
+    exit 1
+}
 
-# Mount OPNsense image as DVD (you may need to convert .img to .iso first)
-# For now, start VM and configure manually through console
+# Mount ISO to VM
+Set-VMDvdDrive -VMName "OPNsense-Lab" -Path "C:\ISOs\OPNsense-25.7-dvd-amd64.iso"
+
+# Start VM
 Start-VM -Name "OPNsense-Lab"
 
-# Connect to VM console
+# Open console
 vmconnect localhost "OPNsense-Lab"
 
-Write-Host "`n🔧 Manual Installation Steps:" -ForegroundColor Cyan
-Write-Host "1. VM will boot - you'll see UEFI shell or boot menu" -ForegroundColor White
-Write-Host "2. Download OPNsense ISO instead: https://opnsense.org/download/" -ForegroundColor White
-Write-Host "3. Select 'dvd' image type instead of 'vga'" -ForegroundColor White
-Write-Host "4. Mount ISO to VM and boot from it" -ForegroundColor White
+Write-Host "`n✓ VM started with OPNsense ISO mounted" -ForegroundColor Green
+Write-Host "Follow the installation wizard in the VM console window" -ForegroundColor Yellow
 ```
 
 ### Method 2: Hyper-V Manager GUI (Step-by-Step)
