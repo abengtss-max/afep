@@ -876,7 +876,7 @@ The VM console will show the OPNsense installer automatically. Follow these step
    ```
    - Retype the same password
    - Press **Enter**
-   - **IMPORTANT:** Write down this password!
+   - **IMPORTANT:** Write down this password! You'll need it after ejecting the ISO.
 
 **9. Installation Complete:**
    ```
@@ -894,26 +894,44 @@ The VM console will show the OPNsense installer automatically. Follow these step
    The system will now reboot...
    ```
    - VM will restart automatically
-   - **Wait 30-60 seconds** for reboot
+   - **Wait for boot** - you'll see OPNsense loading
 
-**11. Eject ISO After Reboot:**
+**11. ⚠️ CRITICAL: You'll Boot into Live Mode First!**
    
-   After the VM reboots, **IMPORTANT:** Eject the ISO to prevent booting from DVD again.
+   After reboot, you'll see this message:
+   ```
+   OPNsense is running in live mode from install media. Please
+   login as 'root' to continue in live mode, or as 'installer' to start the
+   installation. Use the default or previously-imported root password for
+   both accounts.
+   ```
+   
+   **This is expected!** The ISO is still mounted, so it boots from the DVD in live mode.
+   
+   **DO NOT try to login here.** The password you set during installation doesn't work in live mode.
+   
+   **Eject the ISO immediately:**
    
    In PowerShell (Administrator):
    ```powershell
-   # Stop VM (after it finishes rebooting, wait for login prompt)
+   # Stop VM
    Stop-VM -Name "OPNsense-Lab" -Force
    
-   # Eject ISO
+   # Eject ISO (critical step!)
    Set-VMDvdDrive -VMName "OPNsense-Lab" -Path $null
    
-   # Restart VM (will boot from hard disk now)
+   # Verify ISO is ejected
+   Get-VMDvdDrive -VMName "OPNsense-Lab"
+   # Should show: Path = (empty)
+   
+   # Restart VM (will boot from installed system on hard disk now)
    Start-VM -Name "OPNsense-Lab"
    
    # Reconnect to console
    vmconnect localhost "OPNsense-Lab"
    ```
+   
+   **Wait 30-60 seconds for OPNsense to boot from the hard disk.**
 
 ### Step 3.5: Initial OPNsense Configuration
 
@@ -926,9 +944,12 @@ opnsense.localdomain
 login:
 ```
 
-**Login:**
+**✅ Now you can login with YOUR password:**
 - Username: **`root`**
-- Password: **[the password you set during installation]**
+- Password: **[the password you set during installation in Step 8]**
+- Press **Enter**
+
+**⚠️ If you still see "live mode" message:** Go back to Step 11 and eject the ISO!
 
 **Main Console Menu:**
 
