@@ -21,26 +21,35 @@ This guide walks you through setting up the **on-premises environment** on your 
 
 ```
 Your Windows PC (Physical - ARM64 or x64)
-├── Hyper-V Host
-│   ├── VM1: OPNsense Firewall
-│   │   ├── WAN NIC → Your PC's internet (for VPN only)
-│   │   ├── LAN NIC → Internal network (10.0.1.0/24)
-│   │   ├── Enterprise Firewall → URL/FQDN filtering
-│   │   ├── VPN Tunnel → Azure VPN Gateway (IPsec)
-│   │   ├── Azure Arc Rules → 18+ endpoint filters
-│   │   └── Security Policies → Block all except allowed URLs
-│   │
-│   └── VM2: Windows Server 2022 (Arc Server)
-│       ├── NIC → OPNsense LAN (10.0.1.10/24)
-│       ├── Gateway → OPNsense (10.0.1.1)
-│       ├── DNS → Azure Firewall via VPN (10.100.0.4)
-│       ├── NO direct internet access
-│       └── Azure Arc Agent → Uses proxy via VPN
+├── WiFi/Ethernet → Internet (stays connected, completely unaffected!)
 │
-└── Virtual Switches
-    ├── "External" → Physical NIC (internet)
-    └── "Internal-Lab" → Isolated network
+└── Hyper-V Host
+    ├── Default Switch (NAT) → Provides internet to VMs via NAT
+    │   └── OPNsense WAN gets internet (for VPN only)
+    │
+    ├── Internal-Lab Switch → Isolated VM network (10.0.1.0/24)
+    │
+    ├── VM1: OPNsense Firewall
+    │   ├── WAN NIC → Default Switch (NAT internet)
+    │   ├── LAN NIC → Internal-Lab (10.0.1.1/24)
+    │   ├── Enterprise Firewall → URL/FQDN filtering  
+    │   ├── VPN Tunnel → Azure VPN Gateway (IPsec over NAT)
+    │   ├── Azure Arc Rules → 18+ endpoint filters
+    │   └── Security Policies → Block all except allowed URLs
+    │
+    └── VM2: Windows Server 2022 (Arc Server)
+        ├── NIC → Internal-Lab (10.0.1.10/24)
+        ├── Gateway → OPNsense (10.0.1.1)
+        ├── DNS → Azure Firewall via VPN (10.100.0.4)
+        ├── NO direct internet access
+        └── Azure Arc Agent → Uses proxy via VPN tunnel
 ```
+
+**Network Flow:**
+- OPNsense WAN uses Hyper-V NAT to reach internet (for VPN)
+- Windows Server is completely isolated on Internal-Lab network
+- All Arc traffic: Windows Server → OPNsense → VPN Tunnel → Azure Firewall Proxy
+- **Your host PC's WiFi/Ethernet remains fully functional - NO DISRUPTION!**
 
 ---
 
@@ -460,61 +469,98 @@ Hyper-V Manager window should open. You'll use this GUI frequently.
 
 ---
 
-## 📝 Step 2: Create Hyper-V Virtual Switches
+## 📝 Step 2: ✅ Virtual Switches Already Created
 
-> **⚠️ CRITICAL**: All commands in this section **MUST** be run in **PowerShell as Administrator**!
+> **✅ CONNECTIVITY FIX APPLIED**: Your Hyper-V switches are already configured correctly!
 > 
-> **How to open Admin PowerShell:**
-> 1. Press `Windows key`
-> 2. Type: `PowerShell`
-> 3. Right-click "Windows PowerShell" → **Run as administrator**
-> 4. Click "Yes" on UAC prompt
+> **Current Configuration:**
+> - ✅ **Default Switch**: Hyper-V's built-in NAT (internet for VMs)
+> - ✅ **Internal-Lab**: VM-to-VM communication (10.0.1.0/24)
+> - ✅ **No External switches**: Your WiFi/Ethernet is safe!
 
-> **🔒 Network Impact Clarification**: Creating these virtual switches will **NOT** affect your host computer's networking or internet connectivity. The External switch shares your physical network adapter while preserving host connectivity through the `AllowManagementOS=$true` setting. The Internal switch creates an isolated network segment only for VM-to-VM communication within Hyper-V.
+> **✅ WiFi-Safe Design**: Uses Hyper-V **Default Switch (NAT)** + **Internal Switch** - Your host WiFi/Ethernet will **NOT** be affected!
 
-### Create External Switch (for internet/VPN)
+### ✅ Verify Your Current Switch Configuration
+
+Your connectivity fix has already created the optimal switch configuration. Let's verify:
 
 ```powershell
-# List your physical network adapters
-Get-NetAdapter | Select-Object Name, Status, LinkSpeed
+# Verify current switches
+Get-VMSwitch | Format-Table Name, SwitchType, NetAdapterInterfaceDescription -AutoSize
 
-# Auto-detect the active network adapter (WiFi or Ethernet)
-$activeAdapter = Get-NetAdapter | Where-Object {$_.Status -eq "Up" -and $_.Name -notlike "vEthernet*" -and $_.Name -notlike "Bluetooth*"} | Select-Object -First 1
+# Expected output:
+# Name           SwitchType NetAdapterInterfaceDescription
+# ----           ---------- ------------------------------
+# Default Switch   Internal
+# Internal-Lab     Internal  
+# (possibly NAT-Switch Internal if created during fix)
 
-if ($activeAdapter) {
-    Write-Host "Detected active adapter: $($activeAdapter.Name)" -ForegroundColor Green
-    Write-Host "Creating External switch..." -ForegroundColor Yellow
-    
-    New-VMSwitch -Name "External" -NetAdapterName $activeAdapter.Name -AllowManagementOS $true
-    
-    Write-Host "✓ External switch created successfully!" -ForegroundColor Green
+Write-Host "✅ Switch Configuration Verified:" -ForegroundColor Green
+Write-Host "  • Default Switch: Provides NAT internet to VMs" -ForegroundColor White
+Write-Host "  • Internal-Lab: VM-to-VM communication (10.0.1.0/24)" -ForegroundColor White
+Write-Host "  • Your WiFi/Ethernet: Unaffected and working normally" -ForegroundColor Cyan
+```
+
+### ✅ Internal-Lab Switch Already Created
+
+**Your connectivity fix already created this switch!**
+
+```powershell
+# Verify Internal-Lab switch exists
+$internalSwitch = Get-VMSwitch -Name "Internal-Lab" -ErrorAction SilentlyContinue
+
+if ($internalSwitch) {
+    Write-Host "✓ Internal-Lab switch verified" -ForegroundColor Green
+    Write-Host "  This switch provides isolated VM-to-VM communication" -ForegroundColor White
 } else {
-    Write-Host "✗ No active physical network adapter found!" -ForegroundColor Red
-    Write-Host "Please connect to WiFi or Ethernet first." -ForegroundColor Yellow
+    Write-Host "❌ Internal-Lab switch missing - run connectivity fix again" -ForegroundColor Red
 }
 ```
 
-**⚠️ Warning:** Your internet may disconnect briefly (5-10 seconds) during this step.
-
-### Create Internal Switch (for lab network)
+### Verify Switch Configuration
 
 ```powershell
-# Create internal switch for isolated lab network
-New-VMSwitch -Name "Internal-Lab" -SwitchType Internal
+Write-Host "`n=== Virtual Switch Summary ===" -ForegroundColor Cyan
+Get-VMSwitch | Format-Table Name, SwitchType -AutoSize
 
-# Create a new network adapter for the internal switch
-New-NetIPAddress -IPAddress 192.168.100.1 -PrefixLength 24 -InterfaceAlias "vEthernet (Internal-Lab)"
+Write-Host "`nExpected switches:" -ForegroundColor Yellow
+Write-Host "  1. Default Switch (or NAT-Switch) - Provides NAT internet to VMs" -ForegroundColor White
+Write-Host "  2. Internal-Lab - Isolated VM-to-VM network (10.0.1.0/24)" -ForegroundColor White
+Write-Host "`n✅ Your host WiFi/Ethernet: Unaffected and fully functional!" -ForegroundColor Green
 ```
 
-### Verify Switches
+### Clean Up External Switches (If Any Exist)
+
+If you previously created an External switch that broke your WiFi, remove it now:
 
 ```powershell
-Get-VMSwitch | Format-Table Name, SwitchType, NetAdapterInterfaceDescription
+Write-Host "`n=== Checking for problematic External switches ===" -ForegroundColor Cyan
+
+# Check for and remove any External switches
+$externalSwitches = Get-VMSwitch | Where-Object { $_.SwitchType -eq "External" }
+
+if ($externalSwitches) {
+    Write-Host "⚠️  Found External switch(es) that may be blocking your WiFi:" -ForegroundColor Yellow
+    $externalSwitches | ForEach-Object {
+        Write-Host "    - $($_.Name)" -ForegroundColor White
+    }
+    
+    Write-Host "`nRemoving External switches to restore WiFi..." -ForegroundColor Yellow
+    $externalSwitches | ForEach-Object {
+        Remove-VMSwitch -Name $_.Name -Force
+        Write-Host "  ✓ Removed: $($_.Name)" -ForegroundColor Green
+    }
+    Write-Host "`n✅ WiFi should now be restored!" -ForegroundColor Green
+    Write-Host "   Wait 10-30 seconds for your WiFi to reconnect" -ForegroundColor Cyan
+} else {
+    Write-Host "✓ No External switches found (good!)" -ForegroundColor Green
+}
 ```
 
-Should see:
-- `External` (SwitchType: External)
-- `Internal-Lab` (SwitchType: Internal)
+**Network Design:**
+- **Default Switch / NAT-Switch**: OPNsense WAN gets internet via Hyper-V NAT
+- **Internal-Lab**: OPNsense LAN ↔ Windows Server (10.0.1.0/24)
+- **Your WiFi/Ethernet**: Completely unaffected - continues working normally!
 
 ---
 
@@ -558,11 +604,26 @@ New-VM -Name "OPNsense-Lab" `
 # Configure VM settings for OPNsense
 Set-VM -Name "OPNsense-Lab" -ProcessorCount 2 -DynamicMemory -MemoryStartupBytes 2GB -MemoryMinimumBytes 1GB -MemoryMaximumBytes 4GB
 
-# Add second network adapter (VM has 1 by default, we need 2 total)
+# Use Default Switch for NAT internet access (created during connectivity fix)
+$natSwitch = Get-VMSwitch | Where-Object { $_.Name -eq "Default Switch" } | Select-Object -First 1
+
+if (-not $natSwitch) {
+    Write-Host "✗ Default Switch not found! This should exist automatically in Hyper-V." -ForegroundColor Red
+    Write-Host "  Try restarting Hyper-V service or reboot your PC" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "Using Default Switch for OPNsense WAN (internet access)" -ForegroundColor Cyan
+
+# Add second network adapter for LAN (VM has 1 by default for WAN)
 Add-VMNetworkAdapter -VMName "OPNsense-Lab" -SwitchName "Internal-Lab"
 
-# Connect first adapter to External (WAN) - get the first adapter
-Get-VMNetworkAdapter -VMName "OPNsense-Lab" | Where-Object {$_.SwitchName -eq $null} | Connect-VMNetworkAdapter -SwitchName "External"
+# Connect first adapter to Default Switch (WAN interface)  
+Get-VMNetworkAdapter -VMName "OPNsense-Lab" | Select-Object -First 1 | Connect-VMNetworkAdapter -SwitchName "Default Switch"
+
+Write-Host "✓ Network adapters configured:" -ForegroundColor Green
+Write-Host "  - Adapter 1 (WAN): $($natSwitch.Name) - Internet via NAT (no impact on host WiFi)" -ForegroundColor White
+Write-Host "  - Adapter 2 (LAN): Internal-Lab - VM network (10.0.1.0/24)" -ForegroundColor White
 
 # Enable nested virtualization (for advanced features)
 Set-VMProcessor -VMName "OPNsense-Lab" -ExposeVirtualizationExtensions $true
@@ -639,14 +700,15 @@ Write-Host "4. Mount ISO to VM and boot from it" -ForegroundColor White
    - **Name:** `OPNsense-Lab`
    - **Generation:** **Generation 2** (ARM64 compatible)
    - **Memory:** `2048` MB (2GB)
-   - **Network:** Select **External** (WAN interface)
+   - **Network:** Select **Default Switch** (or NAT-Switch) - WAN interface
    - **Hard Disk:** Create new, **16 GB**
    - **Installation:** Browse to OPNsense DVD ISO
 
 4. **Add Second Network Adapter:**
    - Right-click VM → **Settings**
    - **Add Hardware** → **Network Adapter**
-   - **Virtual Switch:** Select **Internal-Lab** (LAN interface)
+   - **Virtual Switch:** Select **Internal-Lab** - LAN interface
+   - Click **OK**
 
 5. **Configure Firmware:**
    - VM Settings → **Security**
@@ -694,10 +756,10 @@ After installation, configure the basic network settings:
 
 1. **Interface Assignment (if prompted):**
    ```
-   WAN interface: em0 (connected to External switch)
+   WAN interface: em0 (connected to Default Switch/NAT-Switch)
    LAN interface: em1 (connected to Internal-Lab switch)
    
-   Proceed with interface assignment? [y|n]: y
+   Assign interfaces now? [y|n]: y
    ```
 
 2. **Set LAN IP Address:**
@@ -712,8 +774,14 @@ After installation, configure the basic network settings:
    - DHCP end address: `10.0.1.200`
    - Revert to HTTP as the webConfigurator protocol: `y`
 
-3. **Access Web Interface:**
-   - OPNsense will display: `The web GUI is now available at: http://10.0.1.1`
+3. **Check WAN IP (should get IP via NAT):**
+   - Select option `1) Status`
+   - WAN should show an IP like 192.168.0.x (from NAT switch)
+   - This confirms OPNsense has internet access for VPN
+
+4. **Access Web Interface:**
+   - From your **host PC**: Open browser to `http://192.168.100.1` (via Internal-Lab)
+   - Or from **Windows Server VM**: Use `http://10.0.1.1`
    - From your Windows 11 PC, open browser: `http://10.0.1.1`
    - **Username:** `root`
    - **Password:** (password you set during installation)
@@ -734,9 +802,9 @@ Complete the setup wizard in the web interface:
    - **Timezone:** Select your timezone
 
 3. **Configure WAN Interface:**
-   - **Type:** `DHCP` (gets IP from your PC's network)
-   - **Block RFC1918 Private Networks:** Uncheck
-   - **Block bogon networks:** Uncheck
+   - **Type:** `DHCP` (gets IP from NAT switch automatically)
+   - **Block RFC1918 Private Networks:** **Uncheck** (important!)
+   - **Block bogon networks:** **Uncheck**
 
 4. **Configure LAN Interface:**
    - **LAN IP Address:** `10.0.1.1`
@@ -750,7 +818,12 @@ Complete the setup wizard in the web interface:
 
 **✅ Basic Configuration Complete!**
 
-The OPNsense firewall is now ready for Azure Arc-specific configuration.
+The OPNsense firewall now has:
+- WAN interface with internet access via NAT (for VPN tunnel to Azure)
+- LAN interface for internal VM network
+- **Your host PC's WiFi/Ethernet remains completely unaffected!**
+
+Next: Configure VPN tunnel to Azure and Arc endpoint filtering rules.
 
 12. **Start VM:**
     - Right-click "OPNsense-Lab" → **Connect**
@@ -1608,7 +1681,7 @@ Write-Host "Azure Firewall Private IP: $($azureInfo.AzureFirewall.PrivateIP)" -F
      - Disabled: ☐ (unchecked)
      - Key Exchange version: `IKEv2`
      - Internet Protocol: `IPv4`
-     - Interface: `WAN`
+     - Interface: `WAN` (connected to Default Switch/NAT)
      - Remote Gateway: `<Azure VPN Gateway Public IP>` (from deployment info)
      - Description: `Azure VPN Gateway`
    
