@@ -56,48 +56,51 @@ A complete Azure Arc deployment using Explicit Proxy over Site-to-Site VPN with 
 
 ---
 
-## 🖥️ Why Windows Server Router Instead of pfSense?
+## 🛡️ Why OPNsense Firewall for Enterprise Simulation?
 
-**ARM64 Compatibility**: pfSense (FreeBSD-based) requires Generation 1 VMs which are **NOT supported** on ARM64 processors (Snapdragon X Elite/Plus). Windows Server Router uses Generation 2 VMs and works on both ARM64 and x64.
+**Enterprise Realism**: OPNsense is a **true enterprise firewall** that mimics the security appliances your customers use in production environments. Unlike basic routing solutions, OPNsense provides:
 
-### Windows Server Router Configuration
+### OPNsense Enterprise Firewall Features
 
-The Windows Server Router VM acts as your on-premises firewall/gateway with:
+The OPNsense Firewall VM acts as your **enterprise security appliance** with:
 
-#### **RRAS (Routing and Remote Access Service) Features:**
-- **NAT (Network Address Translation)**: Provides internet access for internal VMs
-- **VPN Server**: Establishes IPsec Site-to-Site tunnel to Azure
-- **Routing**: Routes traffic between internal network and Azure VNet
-- **Demand Dial Interface**: Manages the Azure VPN connection
+#### **Advanced Firewall Capabilities:**
+- **URL/FQDN Filtering**: Precise control over allowed domains (essential for Azure Arc)
+- **Application Layer Inspection**: Deep packet inspection and protocol analysis
+- **VPN Gateway**: Enterprise IPsec Site-to-Site tunnels to Azure
+- **Intrusion Detection**: Real-time threat monitoring and blocking
+- **Traffic Shaping**: QoS and bandwidth management
+- **High Availability**: Clustering and failover capabilities
 
-#### **Windows Firewall Configuration:**
-```powershell
-# Block all outbound internet traffic (default deny)
-New-NetFirewallRule -DisplayName "Block-Internet-Outbound" `
-    -Direction Outbound -Action Block -Protocol Any `
-    -RemoteAddress "Internet"
-
-# Allow VPN traffic to Azure Gateway
-New-NetFirewallRule -DisplayName "Allow-Azure-VPN" `
-    -Direction Outbound -Action Allow -Protocol Any `
-    -RemoteAddress "20.240.93.34"  # Your Azure VPN Gateway IP
-
-# Allow local network communication
-New-NetFirewallRule -DisplayName "Allow-Local-Network" `
-    -Direction Outbound -Action Allow -Protocol Any `
-    -RemoteAddress "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+#### **Azure Arc Specific Configuration:**
+```bash
+# OPNsense Firewall Rules for Azure Arc
+- Block: All internet traffic (default deny)
+- Allow: login.microsoftonline.com (Azure AD)
+- Allow: management.azure.com (Resource Manager)  
+- Allow: *.his.arc.azure.com (Hybrid Identity)
+- Allow: *.guestconfiguration.azure.com (Extensions)
+- Allow: *.servicebus.windows.net (Notifications)
+- Allow: 18+ additional Azure Arc endpoints
+- Log: All blocked attempts for compliance
 ```
 
-#### **Network Interfaces:**
+#### **Network Architecture:**
 - **WAN Interface**: Connected to "External" switch → Your PC's internet
 - **LAN Interface**: Connected to "Internal-Lab" switch → 10.0.1.1/24
-- **VPN Interface**: Demand Dial Interface → Azure VNet (10.100.0.0/16)
+- **VPN Tunnel**: IPsec connection → Azure VNet (10.100.0.0/16)
+- **DNS Filtering**: Blocks unauthorized domains at DNS level
 
-#### **Security Benefits:**
-- ✅ **Zero Direct Internet**: ArcServer01 cannot access internet directly
-- ✅ **VPN-Only Access**: All Azure communication goes through encrypted tunnel  
-- ✅ **Firewall Controlled**: Windows Firewall enforces security policies
-- ✅ **Enterprise-Grade**: Same technology used in production environments
+#### **ARM64 Compatibility:**
+- ✅ **Generation 2 VM Support**: Works on ARM64 processors (Snapdragon X Elite/Plus)
+- ✅ **Modern FreeBSD**: Updated kernel with ARM64 optimizations
+- ✅ **UEFI Boot**: Native support for modern hardware
+
+#### **Customer Demonstration Value:**
+- ✅ **Real Firewall Technology**: Same type of appliance customers use
+- ✅ **Enterprise Security Policies**: URL filtering, application control, logging
+- ✅ **Compliance Ready**: Audit trails and security reporting
+- ✅ **Azure Arc Proven**: Shows Arc works through restrictive firewalls
 
 ---
 
@@ -226,36 +229,37 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 2](./GUIDE-OnPremises-HyperV-Setup.md#-step-2-create-hyper-v-virtual-switches)
 
-#### Step 2.3: Create Windows Server Router VM (30-40 minutes)
-- ✓ Create VM (Generation 2 for ARM64 compatibility)
-- ✓ Install Windows Server 2022 with Desktop Experience
-- ✓ Configure dual NICs (WAN: External, LAN: Internal-Lab)
-- ✓ Install RRAS role (NAT + Routing + VPN)
-- ✓ Set LAN IP to 10.0.1.1/24
-- ✓ Configure Windows Firewall (block internet, allow VPN)
+#### Step 2.3: Create OPNsense Firewall VM (30-40 minutes)
+- ✓ Download OPNsense 25.7 ISO (ARM64 compatible)
+- ✓ Create Generation 2 VM (2GB RAM, dual NICs)
+- ✓ Install OPNsense enterprise firewall
+- ✓ Configure WAN (External) and LAN (Internal-Lab) interfaces
+- ✓ Set LAN IP to 10.0.1.1/24 with DHCP server
+- ✓ Complete web-based setup wizard
 
-**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 3](./GUIDE-OnPremises-HyperV-Setup.md#-step-3-create-windows-server-router-vm)
+**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 3](./GUIDE-OnPremises-HyperV-Setup.md#-step-3-create-opnsense-firewall-vm)
 
 #### Step 2.4: Create Windows Server VM (20-30 minutes)
 - ✓ Create VM (PowerShell or GUI method)
 - ✓ Install Windows Server 2022 (Desktop Experience)
 - ✓ Configure static IP: 10.0.1.10/24
-- ✓ Set gateway to Router: 10.0.1.1
+- ✓ Set gateway to OPNsense: 10.0.1.1
 - ✓ Rename computer to ArcServer01
 
 **📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 4](./GUIDE-OnPremises-HyperV-Setup.md#-step-4-create-windows-server-2022-vm)
 
-#### Step 2.5: Configure Windows Server Router Security (15 minutes)
-- ✓ Configure Windows Firewall with Advanced Security
-- ✓ Create rules to block all outbound internet traffic
-- ✓ Allow only VPN traffic and local network communication
+#### Step 2.5: Configure OPNsense Azure Arc Firewall Rules (20 minutes)
+- ✓ Access OPNsense web interface (http://10.0.1.1)
+- ✓ Create Azure Arc endpoint aliases (18+ URLs)
+- ✓ Configure firewall rules: allow Arc URLs, block everything else
+- ✓ Enable URL filtering and DNS-based security
 - ✓ Verify internet is blocked from ArcServer01
 
-**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 5](./GUIDE-OnPremises-HyperV-Setup.md#-step-5-configure-windows-server-router-security)
+**📖 Detailed Steps:** [GUIDE-OnPremises-HyperV-Setup.md - Step 5](./GUIDE-OnPremises-HyperV-Setup.md#-step-5-configure-opnsense-azure-arc-firewall-rules)
 
 #### Step 2.6: Configure Site-to-Site VPN (15 minutes)
 - ✓ Get Azure VPN info from `Lab4-Arc-DeploymentInfo.json`
-- ✓ Configure IPsec VPN on Windows Server Router using RRAS
+- ✓ Configure IPsec VPN on OPNsense (Phase 1 + Phase 2)
 - ✓ Update Azure Local Network Gateway with your public IP
 - ✓ Create VPN connection in Azure
 
@@ -263,7 +267,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 #### Step 2.7: Verify VPN Connectivity (5 minutes)
 - ✓ Run 6-point VPN validation script
-- ✓ Test Windows Server Router gateway
+- ✓ Test OPNsense firewall gateway
 - ✓ Test Azure Firewall via VPN
 - ✓ Test proxy ports (8081, 8443)
 - ✓ Verify internet is blocked
@@ -300,7 +304,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 #### Step 3.0: Prerequisites Validation (5 minutes)
 - ✓ Verify hostname is ArcServer01
 - ✓ Verify deployment info file exists
-- ✓ Test Windows Server Router connectivityr connectivity
+- ✓ Test OPNsense firewall connectivity
 - ✓ Test Azure Firewall via VPN
 - ✓ Test proxy ports (8081, 8443)
 - ✓ Verify internet is BLOCKED
@@ -382,7 +386,7 @@ Get-Content ".\Lab4-Arc-DeploymentInfo.json" | ConvertFrom-Json | Format-List
 
 ### ✅ On-Premises Environment
 - Hyper-V virtualization on Windows 11 Pro
-- Windows Server 2022 Router with RRAS and VPN tunnel
+- OPNsense Enterprise Firewall with URL filtering and VPN
 - Windows Server 2022 (ArcServer01)
 - NO direct internet access (security enforced)
 
@@ -416,15 +420,15 @@ Use this lab to demonstrate:
 ### Common Issues:
 
 **VPN Won't Connect:**
-- Check Windows Server Router RRAS status: Server Manager → RRAS Console
+- Check OPNsense VPN status: VPN → IPsec → Status Overview
 - Verify Azure connection: Portal → VPN Gateway → Connections
 - Confirm public IP updated in Local Network Gateway
-- Check Windows Firewall rules on Router
+- Check OPNsense firewall rules and logs
 
 **Can't Reach Azure Firewall:**
-- Verify VPN shows "Connected" in RRAS Console
+- Verify VPN shows "ESTABLISHED" in OPNsense IPsec status
 - Test: `Test-NetConnection 10.100.0.4`
-- Check Windows Server Router firewall rules allow 10.100.0.0/16
+- Check OPNsense firewall rules allow 10.100.0.0/16
 
 **Arc Agent Connection Fails:**
 - Verify proxy environment variables set

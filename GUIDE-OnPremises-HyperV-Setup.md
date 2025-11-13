@@ -688,6 +688,70 @@ Once the VM boots from ISO:
    - OPNsense will start and detect network interfaces
    - Login as `root` with your password
 
+### Initial OPNsense Network Configuration
+
+After installation, configure the basic network settings:
+
+1. **Interface Assignment (if prompted):**
+   ```
+   WAN interface: em0 (connected to External switch)
+   LAN interface: em1 (connected to Internal-Lab switch)
+   
+   Proceed with interface assignment? [y|n]: y
+   ```
+
+2. **Set LAN IP Address:**
+   - Select option `2) Set interface(s) IP address`
+   - Select `2 - LAN`
+   - Configure LAN IPv4 address: `10.0.1.1`
+   - Subnet bit count: `24`
+   - Gateway: Leave empty (press Enter)
+   - Configure IPv6: `n`
+   - Enable DHCP server: `y`
+   - DHCP start address: `10.0.1.100`
+   - DHCP end address: `10.0.1.200`
+   - Revert to HTTP as the webConfigurator protocol: `y`
+
+3. **Access Web Interface:**
+   - OPNsense will display: `The web GUI is now available at: http://10.0.1.1`
+   - From your Windows 11 PC, open browser: `http://10.0.1.1`
+   - **Username:** `root`
+   - **Password:** (password you set during installation)
+
+### 🔧 OPNsense Web Configuration Wizard
+
+Complete the setup wizard in the web interface:
+
+1. **General Information:**
+   - **Hostname:** `opnsense`
+   - **Domain:** `lab.local`
+   - **Primary DNS Server:** `8.8.8.8`
+   - **Secondary DNS Server:** `8.8.4.4`
+   - **Override DNS:** Check this box
+
+2. **Time Server Information:**
+   - **Time Server Hostname:** `pool.ntp.org`
+   - **Timezone:** Select your timezone
+
+3. **Configure WAN Interface:**
+   - **Type:** `DHCP` (gets IP from your PC's network)
+   - **Block RFC1918 Private Networks:** Uncheck
+   - **Block bogon networks:** Uncheck
+
+4. **Configure LAN Interface:**
+   - **LAN IP Address:** `10.0.1.1`
+   - **Subnet Mask:** `24`
+
+5. **Set Root Password:**
+   - Confirm your root password
+
+6. **Reload Configuration:**
+   - Click "Reload" to apply all settings
+
+**✅ Basic Configuration Complete!**
+
+The OPNsense firewall is now ready for Azure Arc-specific configuration.
+
 12. **Start VM:**
     - Right-click "pfSense-Lab" → **Connect**
     - In console window, click **Start**
@@ -1230,57 +1294,263 @@ The VM console will show Windows Setup. Follow these steps:
 
 ---
 
-## 📝 Step 5: Configure pfSense Firewall Rules
+## 📝 Step 5: Configure OPNsense Azure Arc Firewall Rules
 
-### Access pfSense WebGUI
+**🛡️ Enterprise Firewall Configuration for Azure Arc**
 
-From **ArcServer01** (Windows Server VM):
+This section configures OPNsense with **enterprise-grade security policies** that allow only specific Azure Arc endpoints while blocking all other internet access.
 
-1. Open Microsoft Edge
-2. Navigate to: `https://10.0.1.1`
-3. Accept certificate warning (self-signed)
-4. Login:
-   - Username: `admin`
-   - Password: `pfsense`
+### Access OPNsense Web Interface
 
-### Initial Setup Wizard
+From your **Windows 11 PC** (host computer):
 
-1. **Welcome:** Click "Next"
-2. **Netgate Global Support:** Skip (click "Next")
-3. **General Information:**
-   - Hostname: `pfsense`
-   - Domain: `lab.local`
-   - Primary DNS: `1.1.1.1` (Cloudflare)
-   - Secondary DNS: `8.8.8.8` (Google)
-   - Click "Next"
-4. **Time Server:** Leave defaults, click "Next"
-5. **WAN Interface:** Leave as DHCP, click "Next"
-6. **LAN Interface:**
-   - LAN IP: `10.0.1.1`
-   - Subnet: `24`
-   - Click "Next"
-7. **Admin Password:**
-   - Change from default `pfsense` to something stronger
-   - **Remember this password!**
-8. **Reload:** Click "Reload" → Wizard complete
-9. **Finish:** Click "Finish"
+1. **Open Web Browser:** Chrome/Edge
+2. **Navigate to:** `http://10.0.1.1`
+3. **Login:**
+   - **Username:** `root`
+   - **Password:** (password you set during installation)
 
-### Block All Internet Traffic (Except VPN)
+### 🔒 Configure Security Policies
 
-**Goal:** Ensure Arc server can **ONLY** reach Azure via VPN tunnel, no direct internet.
+**Security Objective:** Block all internet access except Azure Arc endpoints (realistic customer environment)
 
-1. **Navigate:** Firewall → Rules → LAN
+#### Step 5.1: Create Alias for Azure Arc Endpoints
 
-2. **Delete Default Rules:**
-   - Find "Default allow LAN to any rule"
-   - Click ✗ (delete icon)
-   - Click "Apply Changes"
+1. **Navigate:** Firewall → Aliases → Hosts
 
-3. **Add Rule: Allow LAN to pfSense**
-   - Click "↑ Add" (add rule to top)
-   - **Action:** Pass
-   - **Interface:** LAN
-   - **Protocol:** Any
+2. **Create "AzureArc_Endpoints" Alias:**
+   - Click **"+"** (Add new alias)
+   - **Name:** `AzureArc_Endpoints`
+   - **Type:** `Host(s)`
+   - **Description:** `Azure Arc Required Endpoints`
+
+3. **Add All Azure Arc URLs:**
+
+   **Core Azure AD Endpoints:**
+   ```
+   login.microsoftonline.com
+   login.microsoft.com
+   login.windows.net
+   pas.windows.net
+   ```
+
+   **Azure Resource Manager:**
+   ```
+   management.azure.com
+   ```
+
+   **Azure Arc Services:**
+   ```
+   *.his.arc.azure.com
+   *.guestconfiguration.azure.com
+   guestnotificationservice.azure.com
+   *.guestnotificationservice.azure.com
+   ```
+
+   **Service Bus & Storage:**
+   ```
+   *.servicebus.windows.net
+   *.blob.core.windows.net
+   ```
+
+   **Download & Package Management:**
+   ```
+   download.microsoft.com
+   *.download.microsoft.com
+   packages.microsoft.com
+   ```
+
+   **Regional Endpoints (replace 'eastus2' with your region):**
+   ```
+   *.eastus2.arcdataservices.com
+   ```
+
+   **Additional Services:**
+   ```
+   dc.services.visualstudio.com
+   www.microsoft.com
+   dls.microsoft.com
+   ```
+
+4. **Save Alias:** Click **Save**
+
+#### Step 5.2: Create DNS Resolver Configuration
+
+1. **Navigate:** Services → Unbound DNS → General
+
+2. **Enable DNS over HTTPS (DoH):**
+   - **Enable:** Check
+   - **Listen Port:** `53`
+
+3. **Configure Upstream DNS:**
+   - **DNS over TLS:** Enable
+   - **DNS Servers:** 
+     ```
+     1.1.1.1@853
+     8.8.8.8@853
+     ```
+
+4. **Advanced Options:**
+   - **Register DHCP leases:** Check
+   - **Register DHCP static mappings:** Check
+
+5. **Apply Changes**
+
+#### Step 5.3: Configure Firewall Rules for Azure Arc
+
+**Navigation:** Firewall → Rules → LAN
+
+**Delete Default Allow Rule:**
+1. Find "Default allow LAN to any rule"
+2. Click **🗑️** (delete)
+3. **Apply Changes**
+
+**Create Azure Arc Allow Rules:**
+
+**Rule 1: Allow LAN to OPNsense**
+- **Action:** Pass ✅
+- **Interface:** LAN
+- **Direction:** in
+- **TCP/IP Version:** IPv4
+- **Protocol:** Any
+- **Source:** LAN net
+- **Destination:** This firewall (self)
+- **Description:** `Allow LAN to OPNsense management`
+- **Save**
+
+**Rule 2: Allow Azure Arc HTTPS Traffic**
+- **Action:** Pass ✅
+- **Interface:** LAN  
+- **Direction:** in
+- **TCP/IP Version:** IPv4
+- **Protocol:** TCP
+- **Source:** LAN net
+- **Destination:** AzureArc_Endpoints (alias)
+- **Destination Port:** HTTPS (443)
+- **Description:** `Allow Azure Arc HTTPS endpoints`
+- **Save**
+
+**Rule 3: Allow Azure Arc HTTP Traffic**
+- **Action:** Pass ✅
+- **Interface:** LAN
+- **Direction:** in  
+- **TCP/IP Version:** IPv4
+- **Protocol:** TCP
+- **Source:** LAN net
+- **Destination:** AzureArc_Endpoints (alias)
+- **Destination Port:** HTTP (80)
+- **Description:** `Allow Azure Arc HTTP endpoints (redirects to HTTPS)`
+- **Save**
+
+**Rule 4: Allow DNS**
+- **Action:** Pass ✅
+- **Interface:** LAN
+- **Direction:** in
+- **TCP/IP Version:** IPv4
+- **Protocol:** TCP/UDP
+- **Source:** LAN net
+- **Destination:** This firewall (self)
+- **Destination Port:** DNS (53)
+- **Description:** `Allow DNS queries to OPNsense`
+- **Save**
+
+**Rule 5: Allow VPN Traffic (Azure Network)**
+- **Action:** Pass ✅
+- **Interface:** LAN
+- **Direction:** in
+- **TCP/IP Version:** IPv4
+- **Protocol:** Any
+- **Source:** LAN net
+- **Destination:** 10.100.0.0/16
+- **Description:** `Allow traffic to Azure VNet via VPN`
+- **Save**
+
+**Rule 6: Block Everything Else (Explicit Deny)**
+- **Action:** Block 🚫
+- **Interface:** LAN
+- **Direction:** in
+- **TCP/IP Version:** IPv4
+- **Protocol:** Any
+- **Source:** LAN net
+- **Destination:** Any
+- **Description:** `Block all other internet traffic`
+- **Log:** Check (to monitor blocked attempts)
+- **Save**
+
+6. **Apply Changes** - Click **Apply Changes**
+
+#### Step 5.4: Advanced URL Filtering (Optional but Recommended)
+
+**For even more precise control:**
+
+1. **Navigate:** Services → Web Proxy → Administration
+
+2. **Enable Proxy:**
+   - **Enable proxy:** Check
+   - **Proxy port:** `3128`
+   - **Visible hostname:** `opnsense-proxy`
+
+3. **Configure Transparent Proxy:**
+   - **Transparent proxy:** Check
+   - **Transparent proxy HTTPS:** Check
+
+4. **URL Filter Categories:**
+   - **Enable access logging:** Check
+   - **Enable URL filter:** Check
+
+5. **Create Custom Category:**
+   - **Name:** `AzureArc_Allowed`
+   - **URLs:** (paste all Azure Arc URLs)
+   - **Action:** Allow
+
+6. **Default Policy:** Block All
+
+**Apply Configuration**
+
+### 🧪 Test Firewall Configuration
+
+From **ArcServer01** (after it's created and configured):
+
+**Test 1: Verify Internet is Blocked**
+```cmd
+# This should FAIL (blocked by firewall)
+ping google.com
+curl http://google.com
+```
+
+**Test 2: Verify Azure Arc Endpoints Work**
+```powershell
+# These should SUCCESS (allowed by firewall rules)
+Test-NetConnection login.microsoftonline.com -Port 443
+Test-NetConnection management.azure.com -Port 443
+```
+
+**Test 3: Verify VPN Network Access**
+```powershell
+# After VPN is configured, this should work
+Test-NetConnection 10.100.0.4 -Port 443
+```
+
+### 📊 Monitor Firewall Activity
+
+**Real-time Monitoring:**
+1. **Navigate:** Firewall → Log Files → Live View
+2. **Filter:** Interface = LAN
+3. **Watch:** Blocked attempts and allowed traffic
+4. **Verify:** Only Azure Arc URLs are allowed
+
+**Analytics Dashboard:**
+1. **Navigate:** Reporting → Firewall
+2. **View:** Top blocked destinations
+3. **Confirm:** Non-Arc URLs are being blocked
+
+**✅ Security Validation:**
+- ✅ Internet access blocked (except Arc endpoints)
+- ✅ Azure Arc URLs allowed and working
+- ✅ VPN traffic permitted
+- ✅ Logging enabled for audit trail
+
+This configuration **mimics real enterprise firewall policies** where internet access is restricted and only business-critical services are permitted.
    - **Source:** LAN net
    - **Destination:** This firewall (self)
    - **Description:** "Allow access to pfSense WebGUI and DNS"
