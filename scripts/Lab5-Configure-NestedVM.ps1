@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Path $isoPath -Force | Out-Null
 
 # Download OPNsense ISO
 Write-Host "  Downloading OPNsense firewall ISO..." -ForegroundColor Gray
-$opnsenseIsoUrl = "https://mirror.ams1.nl.leaseweb.net/opnsense/releases/24.7/OPNsense-24.7-dvd-amd64.iso"
+$opnsenseIsoUrl = "https://opnsense.c0urier.net/releases/24.7/OPNsense-24.7-dvd-amd64.iso"
 $opnsenseIsoPath = "$isoPath\OPNsense-24.7-amd64.iso"
 
 if (-not (Test-Path $opnsenseIsoPath)) {
