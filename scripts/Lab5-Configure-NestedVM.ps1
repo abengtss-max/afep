@@ -18,10 +18,16 @@ $resourceGroupName = "rg-arc-nested-lab"
 $location = "swedencentral"
 
 # Step 1: Create Internal Virtual Switch
-Write-Host "`n[1/5] Creating Internal Virtual Switch..." -ForegroundColor Yellow
-New-VMSwitch -Name "Internal-Lab" -SwitchType Internal -ErrorAction SilentlyContinue
-$adapter = Get-NetAdapter | Where-Object { $_.Name -like "*Internal-Lab*" }
-New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress 10.0.1.254 -PrefixLength 24 -ErrorAction SilentlyContinue
+Write-Host "`n[1/7] Creating Internal Virtual Switch..." -ForegroundColor Yellow
+$existingSwitch = Get-VMSwitch -Name "Internal-Lab" -ErrorAction SilentlyContinue
+if (-not $existingSwitch) {
+    New-VMSwitch -Name "Internal-Lab" -SwitchType Internal | Out-Null
+}
+$adapter = Get-NetAdapter | Where-Object { $_.Name -like "*Internal-Lab*" } | Select-Object -First 1
+$existingIp = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress 10.0.1.254 -ErrorAction SilentlyContinue
+if (-not $existingIp) {
+    New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress 10.0.1.254 -PrefixLength 24 | Out-Null
+}
 Write-Host "  ✓ Internal-Lab switch created (10.0.1.254/24)" -ForegroundColor Green
 
 # Step 2: Download ISO Files
