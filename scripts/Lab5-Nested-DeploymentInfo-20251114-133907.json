@@ -1,0 +1,27 @@
+{
+  "VNetPrefix": "10.100.0.0/16",
+  "NestedVM": {
+    "VmName": "vm-nested-hv",
+    "PublicIp": "135.225.80.207",
+    "PrivateIp": "10.0.1.5"
+  },
+  "NextSteps": [
+    "1. RDP to nested VM: mstsc /v:135.225.80.207",
+    "2. Inside VM, run Lab5-Configure-NestedVM.ps1 to create Arc VM",
+    "3. Install Windows Server on nested Arc VM",
+    "4. Run Arc-Onboard.ps1 to onboard agent using proxy: http://10.100.0.4:8443"
+  ],
+  "AdminUsername": "azureadmin",
+  "SubscriptionId": "b67d7073-183c-499f-aaa9-bbb4986dedf1",
+  "Timestamp": "20251114-133907",
+  "ResourceGroupName": "rg-arc-nested-lab",
+  "OnPremPrefix": "10.0.1.0/24",
+  "Location": "swedencentral",
+  "AzureHub": {
+    "FirewallPublicIp": "20.240.92.5",
+    "FirewallPrivateIp": "10.100.0.4",
+    "VpnSharedKey": "AzureArc2025!Lab5-mmuklyjjfwml4",
+    "ExplicitProxyUrl": "http://10.100.0.4:8443",
+    "VpnGatewayPublicIp": "4.223.154.191"
+  }
+}
